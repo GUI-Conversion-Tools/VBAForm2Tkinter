@@ -1,6 +1,6 @@
 Attribute VB_Name = "VBAForm2Tkinter"
 
-' VBAForm2Tkinter v1.2.2
+' VBAForm2Tkinter v1.3.0
 ' https://github.com/GUI-Conversion-Tools/VBAForm2Tkinter
 ' Copyright (c) 2025-2026 ZeeZeX
 ' This software is released under the MIT License.
@@ -31,18 +31,30 @@ Option Explicit
     Private Declare Function GetDeviceCaps Lib "gdi32" (ByVal hdc As Long, ByVal nIndex As Long) As Long
 #End If
 
-
+Private Const FORM_WINDOW_NAME As String = "window"
 
 Sub TestRunConversion2Tk()
     Call ConvertForm2Tkinter(UserForm1)
 End Sub
 
+Sub TestRunConversion2Tk_2()
+    Call ConvertForm2Tkinter(Array(UserForm1, UserForm2))
+End Sub
 
-Sub ConvertForm2Tkinter(ByVal frm As Object)
+Sub ConvertForm2Tkinter(ByVal frms As Variant, Optional ByVal useCls As Boolean = False, Optional ByVal noMainLoop As Boolean = False)
+    
+    ' frms: Variant
+    '   Accepts a single UserForm object or an Array of UserForm objects to be converted.
+    ' useCls: Boolean
+    '   If set to True, the generated Python code will wrap each form in a Python class structure.
+    '   This is automatically set to True if frms is an array.
+    ' noMainLoop: Boolean
+    '   If set to True, the .mainloop() call will be omitted from the end of the generated Python script.
+    
     Dim code As String
     Dim filePath As String
     Dim saveDir As String
-    code = VBAForm2Tkinter(frm)
+    code = VBAForm2Tkinter(frms, useCls, noMainLoop)
     If code <> "" Then
         If ThisWorkbook.Path = "" Then
             saveDir = "C:"
@@ -59,7 +71,20 @@ Sub ConvertForm2Tkinter(ByVal frm As Object)
 End Sub
 
 
-Function VBAForm2Tkinter(ByVal root As Object) As String
+Function VBAForm2Tkinter(ByVal frms As Variant, Optional ByVal useCls As Boolean = False, Optional ByVal noMainLoop As Boolean = False) As String
+    Dim root As Variant
+    Dim indent As String
+    Dim prefix As String
+    Dim clsNumber As Long
+    Dim formName As String
+    Dim controlName As String
+    Dim parentName As String
+    Dim childName As String
+    Dim itemsListName As String
+    Dim tkStyleBaseName As String
+    Dim instanceName As String
+    Dim toplevelInstanceName As String
+    Dim unavailableNames() As Variant
     Dim ctrl As MSForms.Control
     Dim ctrls As Collection
     Dim item As Variant
@@ -87,246 +112,341 @@ Function VBAForm2Tkinter(ByVal root As Object) As String
     
     r = ""
     
-    dpis = GetPrimaryMonitorDPI
-    scaleFactorX = dpis(0) / 96
-    scaleFactorY = dpis(1) / 96
+    If IsArray(frms) Then
+        useCls = True
+    Else
+        frms = Array(frms)
+    End If
     
-    ' Get factor for size conversion
-    sizeFactorsAndOffsets = GetUserFormScaleFactorsAndOffsets(root)
-    sizeFactorX = sizeFactorsAndOffsets(0)
-    sizeFactorY = sizeFactorsAndOffsets(1)
-    ' Convert UserForm's size to pixel size
-    pixelWidth = UserFormSizeToPixel(root.Width, sizeFactorX)
-    pixelHeight = UserFormSizeToPixel(root.Height, sizeFactorY)
-    pixelWidth = pixelWidth - sizeFactorsAndOffsets(2)
-    pixelHeight = pixelHeight - sizeFactorsAndOffsets(3)
-    ' Divide window size by scaling factor
-    pixelWidth = Round(pixelWidth / scaleFactorX)
-    pixelHeight = Round(pixelHeight / scaleFactorY)
+    If useCls Then
+        indent = "        "
+        prefix = "self."
+    Else
+        indent = ""
+        prefix = ""
+    End If
     
     r = r & "import tkinter as tk" & vbLf
     r = r & "from tkinter import ttk" & vbLf
     r = r & "from tkinter import font" & vbLf
     r = r & vbLf
-    r = r & root.Name & " = " & "tk.Tk()" & vbLf
-    caption = root.caption
-    caption = Convert2PythonFormatText(caption)
-    r = r & root.Name & ".title(" & q & caption & q & ")" & vbLf
-    r = r & root.Name & ".geometry(" & q & pixelWidth & "x" & pixelHeight & q & ")" & vbLf
-    r = r & root.Name & ".resizable(False, False)" & vbLf
-    r = r & root.Name & ".configure(bg=" & q & FormColorToHex(root.BackColor) & q & ")" & vbLf
-    r = r & GetBorderSetting(root) & vbLf
     
-    cursorType = GetControlCursorType(root)
-    If cursorType <> "" Then
-        r = r & root.Name & ".configure(cursor=" & q & cursorType & q & ")" & vbLf
-    Else
-        r = r & root.Name & ".configure(cursor=" & "None" & ")" & vbLf
-    End If
-    
-    r = r & vbLf
-    r = r & "style = ttk.Style()" & vbLf
-    r = r & "style.theme_use('default')" & vbLf
-    r = r & vbLf
-    Set ctrls = SortFormControlsByDepth(root.Controls)
-    For Each ctrl In ctrls
-        If GetTkWidgetName(ctrl) <> "" Then
-            widgetType = GetTkWidgetName(ctrl)
-            
-            ' For ttk widget
-            If ContainsValue(Array("Combobox", "Notebook", "Scale"), widgetType) Then
-                widgetType = "ttk." & widgetType
-            Else
-                widgetType = "tk." & widgetType
-            End If
-            
-            pixelLeft = UserFormSizeToPixel(ctrl.Left, sizeFactorX)
-            pixelTop = UserFormSizeToPixel(ctrl.Top, sizeFactorY)
-            pixelWidth = UserFormSizeToPixel(ctrl.Width, sizeFactorX)
-            pixelHeight = UserFormSizeToPixel(ctrl.Height, sizeFactorY)
-            
-            pixelLeft = Round(pixelLeft / scaleFactorX)
-            pixelTop = Round(pixelTop / scaleFactorY)
-            pixelWidth = Round(pixelWidth / scaleFactorX)
-            pixelHeight = Round(pixelHeight / scaleFactorY)
-            
-            r = r & ctrl.Name & " = " & widgetType & "(" & ctrl.Parent.Name & ")" & vbLf
-            r = r & ctrl.Name & ".place(x=" & pixelLeft & ", y=" & pixelTop & ", width=" & pixelWidth & ", height=" & pixelHeight & ")" & vbLf
-            
-            If GetTkWidgetName(ctrl) = "LabelFrame" Or Not ContainsValue(Array("ComboBox", "Frame", "Image", "ScrollBar", "MultiPage"), TypeName(ctrl)) Then
-                ' Set ForeColor
-                r = r & ctrl.Name & ".configure(fg=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
-            End If
-            
-            If Not ContainsValue(Array("ComboBox", "MultiPage", "ScrollBar"), TypeName(ctrl)) Then
-                ' Set BackColor
-                colorCode = FormColorToHex(ctrl.BackColor)
-                If ContainsValue(Array("Label", "TextBox", "CommandButton", "CheckBox", "ToggleButton", "OptionButton", "Image"), TypeName(ctrl)) Then
-                    ' If the BackStyle is set to Transparent, apply the BackColor of the parent control
-                    If ctrl.BackStyle = fmBackStyleTransparent Then
-                        If TypeName(ctrl.Parent) <> "Page" Then
-                            colorCode = FormColorToHex(ctrl.Parent.BackColor)
-                        Else
-                            ' Because the Page control does not have a BackColor property, set the color to &H8000000F&, which matches the background color of the Page
-                            colorCode = FormColorToHex(&H8000000F)
-                        End If
-                    End If
-                End If
-                r = r & ctrl.Name & ".configure(bg=" & q & colorCode & q & ")" & vbLf
-                
-                If ContainsValue(Array("CommandButton", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
-                    ' Set the colors when the button is pressed
-                    r = r & ctrl.Name & ".configure(activeforeground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
-                    r = r & ctrl.Name & ".configure(activebackground=" & q & colorCode & q & ")" & vbLf
-                End If
-                
-                If TypeName(ctrl) = "ToggleButton" Then
-                    r = r & ctrl.Name & ".configure(indicatoron=0)" & vbLf
-                    r = r & ctrl.Name & ".configure(selectcolor=" & q & colorCode & q & ")" & vbLf
-                End If
-                
-            End If
-            
-            If GetTkWidgetName(ctrl) = "LabelFrame" Or ContainsValue(Array("Label", "CommandButton", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
-                caption = ctrl.caption
-                caption = Convert2PythonFormatText(caption)
-                r = r & ctrl.Name & ".configure(text=" & q & caption & q & ")" & vbLf
-            End If
-            
-            
-            If TypeName(ctrl) = "TextBox" Then
-                If GetTkWidgetName(ctrl) = "Entry" Then
-                    r = r & ctrl.Name & ".insert(0, " & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
-                ElseIf GetTkWidgetName(ctrl) = "Text" Then
-                    r = r & ctrl.Name & ".insert(" & q & "1.0" & q & ", " & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
-                End If
-            End If
-            
-            If TypeName(ctrl) = "ComboBox" Then
-                styleName = ctrl.Name & "_style" & ".TCombobox"
-                r = r & "style.configure(" & q & styleName & q & ", foreground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
-                colorCode = FormColorToHex(ctrl.BackColor)
-                
-                If ctrl.BackStyle = fmBackStyleTransparent Then
-                    If TypeName(ctrl.Parent) <> "Page" Then
-                        colorCode = FormColorToHex(ctrl.Parent.BackColor)
-                    Else
-                        colorCode = FormColorToHex(&H8000000F)
-                    End If
-                End If
-                
-                r = r & "style.configure(" & q & styleName & q & ", fieldbackground=" & q & colorCode & q & ")" & vbLf
-                r = r & ctrl.Name & ".configure(style=" & q & styleName & q & ")" & vbLf
-                r = r & ctrl.Name & "_items_value = " & GetListBoxValue(ctrl) & vbLf
-                r = r & ctrl.Name & ".configure(value=" & ctrl.Name & "_items_value" & ")" & vbLf
-                r = r & ctrl.Name & ".set(" & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
-            End If
-            
-            If TypeName(ctrl) = "ListBox" Then
-                r = r & ctrl.Name & "_items_value = " & GetListBoxValue(ctrl) & vbLf
-                r = r & ctrl.Name & ".insert(tk.END, " & "*" & ctrl.Name & "_items_value" & ")" & vbLf
-            End If
-            
-            If TypeName(ctrl) = "ScrollBar" Then
-                Select Case ctrl.orientation
-                    Case -1
-                        If ctrl.Width > ctrl.Height Then
-                            orientation = "Horizontal"
-                        Else
-                            orientation = "Vertical"
-                        End If
-                        
-                    Case 0
-                        orientation = "Vertical"
-                    Case 1
-                        orientation = "Horizontal"
-                    Case Else
-                        orientation = "Vertical"
-                End Select
-                r = r & ctrl.Name & ".configure(from_=" & ctrl.Min & ", to=" & ctrl.Max & ",orient=" & q & LCase(orientation) & q & ")" & vbLf
-                styleName = ctrl.Name & "_style" & "." & orientation & ".TScale"
-                r = r & "style.configure(" & q & styleName & q & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
-                r = r & ctrl.Name & ".configure(style=" & q & styleName & q & ")" & vbLf
-            End If
-            
-            ' Set each Caption and font in MultiPage, font size is rounded
-            If TypeName(ctrl) = "MultiPage" Then
-                For Each item In ctrl.Pages
-                    caption = item.caption
-                    caption = Convert2PythonFormatText(caption)
-                    r = r & item.Name & " = tk.Frame(" & ctrl.Name & ")" & vbLf
-                    r = r & ctrl.Name & ".add(" & item.Name & ", text=" & q & caption & q & ")" & vbLf
-                Next
-                
-                
-                fontStyle = ""
-                fontOpts = ""
-                
-                If ctrl.Font.Bold Then fontStyle = fontStyle & ", weight=" & q & "bold" & q
-                If ctrl.Font.Italic Then fontStyle = fontStyle & ", slant=" & q & "italic" & q
-                If ctrl.Font.Underline Then fontOpts = fontOpts & ", underline=1"
-                If ctrl.Font.Strikethrough Then fontOpts = fontOpts & ", overstrike=1"
-                
-                
-                styleName = ctrl.Name & "_style" & ".Tab"
-                r = r & "style.configure(" & q & styleName & q & ", foreground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
-                r = r & "style.configure(" & q & styleName & q & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
-                r = r & "style.configure(" & q & styleName & q & ",font=font.Font(family=" & q & ctrl.Font.Name & q & ", size=" & Round(ctrl.Font.Size) & fontStyle & fontOpts & "))" & vbLf
-                r = r & ctrl.Name & ".configure(style=" & q & styleName & q & ")" & vbLf
-            End If
-            
-            
-            ' Font size is rounded because Tkinter does not support floats in font settings
-            If GetTkWidgetName(ctrl) = "LabelFrame" Or Not ContainsValue(Array("Frame", "ScrollBar", "Image", "SpinButton", "MultiPage"), TypeName(ctrl)) Then
-                fontStyle = ""
-                fontOpts = ""
-                
-                If ctrl.Font.Bold Then fontStyle = fontStyle & ", weight=" & q & "bold" & q
-                If ctrl.Font.Italic Then fontStyle = fontStyle & ", slant=" & q & "italic" & q
-                If ctrl.Font.Underline Then fontOpts = fontOpts & ", underline=1"
-                If ctrl.Font.Strikethrough Then fontOpts = fontOpts & ", overstrike=1"
-                
-                r = r & ctrl.Name & ".configure(font=font.Font(family=" & q & ctrl.Font.Name & q & ", size=" & Round(ctrl.Font.Size) & fontStyle & fontOpts & "))" & vbLf
-            End If
-            
-            
-            If ContainsValue(Array("Frame", "TextBox", "Label", "ListBox", "Image"), TypeName(ctrl)) Then
-                ' Tkinter's Combobox does not support customizing border colors or relief
-                r = r & GetBorderSetting(ctrl) & vbLf
-            End If
-            
-            If GetTkWidgetName(ctrl) <> "Text" And ContainsValue(Array("Label", "TextBox", "ComboBox", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
-                r = r & GetTextAlignSetting(ctrl) & vbLf
-            End If
-            
-            ' Set mouse cursor
-            If TypeName(ctrl) <> "MultiPage" Then
-                cursorType = GetControlCursorType(ctrl)
-                If cursorType <> "" Then
-                    r = r & ctrl.Name & ".configure(cursor=" & q & cursorType & q & ")" & vbLf
-                Else
-                    r = r & ctrl.Name & ".configure(cursor=" & "None" & ")" & vbLf
-                End If
-            End If
-            
-            If TypeName(ctrl) = "Image" Then
-                r = r & "#" & ctrl.Name & "_photo = tk.PhotoImage(file=r" & q & q & ")" & vbLf
-                r = r & "#" & ctrl.Name & ".create_image(0, 0, image=" & ctrl.Name & "_photo" & ", anchor=tk.NW)" & vbLf
-            End If
-            
-            r = r & vbLf
-            
-        Else
-            MsgBox GenerateUnsupportedControlMessage(ctrl)
+    For Each root In frms
+        unavailableNames = VBA.Array("", "tk", "ttk", "font", "style")
+        
+        For i = LBound(unavailableNames) To UBound(unavailableNames)
+            unavailableNames(i) = LCase(unavailableNames(i))
+        Next
+        
+        If ContainsValue(unavailableNames, LCase(root.Name)) Then
+            MsgBox GenerateUnavailableNameMessage(root)
             r = ""
             VBAForm2Tkinter = r
             Exit Function
         End If
-    Next ctrl
-    r = r & SetTkRadiobuttonValues(ctrls) & vbLf
-    r = r & SetTkCheckbuttonValues(ctrls) & vbLf
-    r = r & root.Name & ".mainloop()"
+        unavailableNames(0) = LCase(FORM_WINDOW_NAME)
+        
+        dpis = GetPrimaryMonitorDPI
+        scaleFactorX = dpis(0) / 96
+        scaleFactorY = dpis(1) / 96
+        
+        ' Get factor for size conversion
+        sizeFactorsAndOffsets = GetUserFormScaleFactorsAndOffsets(root)
+        sizeFactorX = sizeFactorsAndOffsets(0)
+        sizeFactorY = sizeFactorsAndOffsets(1)
+        ' Convert UserForm's size to pixel size
+        pixelWidth = UserFormSizeToPixel(root.Width, sizeFactorX)
+        pixelHeight = UserFormSizeToPixel(root.Height, sizeFactorY)
+        pixelWidth = pixelWidth - sizeFactorsAndOffsets(2)
+        pixelHeight = pixelHeight - sizeFactorsAndOffsets(3)
+        ' Divide window size by scaling factor
+        pixelWidth = Round(pixelWidth / scaleFactorX)
+        pixelHeight = Round(pixelHeight / scaleFactorY)
+        
+        formName = GetControlName(root, prefix, useCls)
+        
+        If useCls Then
+            r = r & "class " & root.Name & ":" & vbLf & "    " & "def __init__(self, parent=None):" & vbLf
+            r = r & indent & "if parent is None:" & vbLf & _
+            indent & "    " & formName & " = " & "tk.Tk()" & vbLf & _
+            indent & "else:" & vbLf & _
+            indent & "    " & formName & " = " & "tk.Toplevel(parent)" & vbLf
+        Else
+            r = r & indent & formName & " = " & "tk.Tk()" & vbLf
+        End If
+        
+        
+        caption = root.caption
+        caption = Convert2PythonFormatText(caption)
+        r = r & indent & formName & ".title(" & q & caption & q & ")" & vbLf
+        r = r & indent & formName & ".geometry(" & q & pixelWidth & "x" & pixelHeight & q & ")" & vbLf
+        r = r & indent & formName & ".resizable(False, False)" & vbLf
+        r = r & indent & formName & ".configure(bg=" & q & FormColorToHex(root.BackColor) & q & ")" & vbLf
+        r = r & indent & formName & GetBorderSetting(root) & vbLf
+        
+        cursorType = GetControlCursorType(root)
+        If cursorType <> "" Then
+            r = r & indent & formName & ".configure(cursor=" & q & cursorType & q & ")" & vbLf
+        Else
+            r = r & indent & formName & ".configure(cursor=" & "None" & ")" & vbLf
+        End If
+        
+        r = r & vbLf
+        r = r & indent & prefix & "style = ttk.Style()" & vbLf
+        r = r & indent & prefix & "style.theme_use('default')" & vbLf
+        r = r & vbLf
+        Set ctrls = SortFormControlsByDepth(root.Controls)
+        For Each ctrl In ctrls
+            controlName = GetControlName(ctrl, prefix, useCls)
+            parentName = GetParentName(ctrl, prefix, useCls)
+            itemsListName = controlName & "_items_value"
+            tkStyleBaseName = ctrl.Name & "_style"
+            
+            If ContainsValue(unavailableNames, LCase(ctrl.Name)) Then
+                MsgBox GenerateUnavailableNameMessage(ctrl)
+                r = ""
+                VBAForm2Tkinter = r
+                Exit Function
+            End If
+            
+            If GetTkWidgetName(ctrl) <> "" Then
+                widgetType = GetTkWidgetName(ctrl)
+                
+                ' For ttk widget
+                If ContainsValue(Array("Combobox", "Notebook", "Scale"), widgetType) Then
+                    widgetType = "ttk." & widgetType
+                Else
+                    widgetType = "tk." & widgetType
+                End If
+                
+                pixelLeft = UserFormSizeToPixel(ctrl.Left, sizeFactorX)
+                pixelTop = UserFormSizeToPixel(ctrl.Top, sizeFactorY)
+                pixelWidth = UserFormSizeToPixel(ctrl.Width, sizeFactorX)
+                pixelHeight = UserFormSizeToPixel(ctrl.Height, sizeFactorY)
+                
+                pixelLeft = Round(pixelLeft / scaleFactorX)
+                pixelTop = Round(pixelTop / scaleFactorY)
+                pixelWidth = Round(pixelWidth / scaleFactorX)
+                pixelHeight = Round(pixelHeight / scaleFactorY)
+                
+                r = r & indent & controlName & " = " & widgetType & "(" & parentName & ")" & vbLf
+                r = r & indent & controlName & ".place(x=" & pixelLeft & ", y=" & pixelTop & ", width=" & pixelWidth & ", height=" & pixelHeight & ")" & vbLf
+                
+                If GetTkWidgetName(ctrl) = "LabelFrame" Or Not ContainsValue(Array("ComboBox", "Frame", "Image", "ScrollBar", "MultiPage"), TypeName(ctrl)) Then
+                    ' Set ForeColor
+                    r = r & indent & controlName & ".configure(fg=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
+                End If
+                
+                If Not ContainsValue(Array("ComboBox", "MultiPage", "ScrollBar"), TypeName(ctrl)) Then
+                    ' Set BackColor
+                    colorCode = FormColorToHex(ctrl.BackColor)
+                    If ContainsValue(Array("Label", "TextBox", "CommandButton", "CheckBox", "ToggleButton", "OptionButton", "Image"), TypeName(ctrl)) Then
+                        ' If the BackStyle is set to Transparent, apply the BackColor of the parent control
+                        If ctrl.BackStyle = fmBackStyleTransparent Then
+                            If TypeName(ctrl.Parent) <> "Page" Then
+                                colorCode = FormColorToHex(ctrl.Parent.BackColor)
+                            Else
+                                ' Because the Page control does not have a BackColor property, set the color to &H8000000F&, which matches the background color of the Page
+                                colorCode = FormColorToHex(&H8000000F)
+                            End If
+                        End If
+                    End If
+                    r = r & indent & controlName & ".configure(bg=" & q & colorCode & q & ")" & vbLf
+                    
+                    If ContainsValue(Array("CommandButton", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
+                        ' Set the colors when the button is pressed
+                        r = r & indent & controlName & ".configure(activeforeground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
+                        r = r & indent & controlName & ".configure(activebackground=" & q & colorCode & q & ")" & vbLf
+                    End If
+                    
+                    If TypeName(ctrl) = "ToggleButton" Then
+                        r = r & indent & controlName & ".configure(indicatoron=0)" & vbLf
+                        r = r & indent & controlName & ".configure(selectcolor=" & q & colorCode & q & ")" & vbLf
+                    End If
+                    
+                End If
+                
+                If GetTkWidgetName(ctrl) = "LabelFrame" Or ContainsValue(Array("Label", "CommandButton", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
+                    caption = ctrl.caption
+                    caption = Convert2PythonFormatText(caption)
+                    r = r & indent & controlName & ".configure(text=" & q & caption & q & ")" & vbLf
+                End If
+                
+                
+                If TypeName(ctrl) = "TextBox" Then
+                    If GetTkWidgetName(ctrl) = "Entry" Then
+                        r = r & indent & controlName & ".insert(0, " & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
+                    ElseIf GetTkWidgetName(ctrl) = "Text" Then
+                        r = r & indent & controlName & ".insert(" & q & "1.0" & q & ", " & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
+                    End If
+                End If
+                
+                If TypeName(ctrl) = "ComboBox" Then
+                    styleName = tkStyleBaseName & ".TCombobox"
+                    r = r & indent & prefix & "style.configure(" & q & styleName & q & ", foreground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
+                    colorCode = FormColorToHex(ctrl.BackColor)
+                    
+                    If ctrl.BackStyle = fmBackStyleTransparent Then
+                        If TypeName(ctrl.Parent) <> "Page" Then
+                            colorCode = FormColorToHex(ctrl.Parent.BackColor)
+                        Else
+                            colorCode = FormColorToHex(&H8000000F)
+                        End If
+                    End If
+                    
+                    r = r & indent & prefix & "style.configure(" & q & styleName & q & ", fieldbackground=" & q & colorCode & q & ")" & vbLf
+                    r = r & indent & controlName & ".configure(style=" & q & styleName & q & ")" & vbLf
+                    r = r & indent & itemsListName & " = " & GetListBoxValue(ctrl, indent) & vbLf
+                    r = r & indent & controlName & ".configure(value=" & itemsListName & ")" & vbLf
+                    r = r & indent & controlName & ".set(" & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
+                End If
+                
+                If TypeName(ctrl) = "ListBox" Then
+                    r = r & indent & itemsListName & " = " & GetListBoxValue(ctrl, indent) & vbLf
+                    r = r & indent & controlName & ".insert(tk.END, " & "*" & itemsListName & ")" & vbLf
+                End If
+                
+                If TypeName(ctrl) = "ScrollBar" Then
+                    Select Case ctrl.orientation
+                        Case -1
+                            If ctrl.Width > ctrl.Height Then
+                                orientation = "Horizontal"
+                            Else
+                                orientation = "Vertical"
+                            End If
+                            
+                        Case 0
+                            orientation = "Vertical"
+                        Case 1
+                            orientation = "Horizontal"
+                        Case Else
+                            orientation = "Vertical"
+                    End Select
+                    r = r & indent & controlName & ".configure(from_=" & ctrl.Min & ", to=" & ctrl.Max & ",orient=" & q & LCase(orientation) & q & ")" & vbLf
+                    styleName = tkStyleBaseName & "." & orientation & ".TScale"
+                    r = r & indent & prefix & "style.configure(" & q & styleName & q & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
+                    r = r & indent & controlName & ".configure(style=" & q & styleName & q & ")" & vbLf
+                End If
+                
+                ' Set each Caption and font in MultiPage, font size is rounded
+                If TypeName(ctrl) = "MultiPage" Then
+                    For Each item In ctrl.Pages
+                        childName = GetControlName(item, prefix, useCls)
+                        caption = item.caption
+                        caption = Convert2PythonFormatText(caption)
+                        r = r & indent & childName & " = tk.Frame(" & controlName & ")" & vbLf
+                        r = r & indent & controlName & ".add(" & childName & ", text=" & q & caption & q & ")" & vbLf
+                    Next
+                    
+                    
+                    fontStyle = ""
+                    fontOpts = ""
+                    
+                    If ctrl.Font.Bold Then fontStyle = fontStyle & ", weight=" & q & "bold" & q
+                    If ctrl.Font.Italic Then fontStyle = fontStyle & ", slant=" & q & "italic" & q
+                    If ctrl.Font.Underline Then fontOpts = fontOpts & ", underline=1"
+                    If ctrl.Font.Strikethrough Then fontOpts = fontOpts & ", overstrike=1"
+                    
+                    
+                    styleName = tkStyleBaseName & ".Tab"
+                    r = r & indent & prefix & "style.configure(" & q & styleName & q & ", foreground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
+                    r = r & indent & prefix & "style.configure(" & q & styleName & q & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
+                    r = r & indent & prefix & "style.configure(" & q & styleName & q & ",font=font.Font(family=" & q & ctrl.Font.Name & q & ", size=" & Round(ctrl.Font.Size) & fontStyle & fontOpts & "))" & vbLf
+                    r = r & indent & controlName & ".configure(style=" & q & styleName & q & ")" & vbLf
+                End If
+                
+                
+                ' Font size is rounded because Tkinter does not support floats in font settings
+                If GetTkWidgetName(ctrl) = "LabelFrame" Or Not ContainsValue(Array("Frame", "ScrollBar", "Image", "SpinButton", "MultiPage"), TypeName(ctrl)) Then
+                    fontStyle = ""
+                    fontOpts = ""
+                    
+                    If ctrl.Font.Bold Then fontStyle = fontStyle & ", weight=" & q & "bold" & q
+                    If ctrl.Font.Italic Then fontStyle = fontStyle & ", slant=" & q & "italic" & q
+                    If ctrl.Font.Underline Then fontOpts = fontOpts & ", underline=1"
+                    If ctrl.Font.Strikethrough Then fontOpts = fontOpts & ", overstrike=1"
+                    
+                    r = r & indent & controlName & ".configure(font=font.Font(family=" & q & ctrl.Font.Name & q & ", size=" & Round(ctrl.Font.Size) & fontStyle & fontOpts & "))" & vbLf
+                End If
+                
+                
+                If ContainsValue(Array("Frame", "TextBox", "Label", "ListBox", "Image"), TypeName(ctrl)) Then
+                    ' Tkinter's Combobox does not support customizing border colors or relief
+                    r = r & indent & controlName & GetBorderSetting(ctrl) & vbLf
+                End If
+                
+                If GetTkWidgetName(ctrl) <> "Text" And ContainsValue(Array("Label", "TextBox", "ComboBox", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
+                    r = r & GetTextAlignSetting(ctrl, indent, prefix, useCls) & vbLf
+                End If
+                
+                ' Set mouse cursor
+                If TypeName(ctrl) <> "MultiPage" Then
+                    cursorType = GetControlCursorType(ctrl)
+                    If cursorType <> "" Then
+                        r = r & indent & controlName & ".configure(cursor=" & q & cursorType & q & ")" & vbLf
+                    Else
+                        r = r & indent & controlName & ".configure(cursor=" & "None" & ")" & vbLf
+                    End If
+                End If
+                
+                If TypeName(ctrl) = "Image" Then
+                    r = r & indent & "#" & controlName & "_photo = tk.PhotoImage(file=r" & q & q & ")" & vbLf
+                    r = r & indent & "#" & controlName & ".create_image(0, 0, image=" & controlName & "_photo" & ", anchor=tk.NW)" & vbLf
+                End If
+                
+                r = r & vbLf
+                
+            Else
+                MsgBox GenerateUnsupportedControlMessage(ctrl)
+                r = ""
+                VBAForm2Tkinter = r
+                Exit Function
+            End If
+        Next ctrl
+        r = r & SetTkRadiobuttonValues(ctrls, indent, prefix, useCls) & vbLf
+        r = r & SetTkCheckbuttonValues(ctrls, indent, prefix, useCls) & vbLf
+        If Not useCls And Not noMainLoop Then
+            r = r & formName & ".mainloop()" & vbLf
+        End If
+    Next root
+    
+    If useCls And Not noMainLoop Then
+        clsNumber = 0
+        For Each root In frms
+            clsNumber = clsNumber + 1
+            instanceName = "obj_" & root.Name
+            If clsNumber <= 1 Then
+                r = r & instanceName & " = " & root.Name & "()" & vbLf
+                toplevelInstanceName = instanceName
+            Else
+                r = r & instanceName & " = " & root.Name & "(" & toplevelInstanceName & "." & FORM_WINDOW_NAME & ")" & vbLf
+            End If
+        Next
+        r = r & toplevelInstanceName & "." & FORM_WINDOW_NAME & ".mainloop()"
+    End If
     VBAForm2Tkinter = r
+End Function
+
+Private Function GetParentName(ByVal ctrl As Object, ByVal prefix As String, ByVal useCls As Boolean) As String
+    Dim parentName As String
+    ' If the object name and type name of a control match, it is considered a UserForm.
+    If ctrl.Parent.Name = TypeName(ctrl.Parent) And useCls Then
+        parentName = prefix & FORM_WINDOW_NAME
+    Else
+        parentName = prefix & ctrl.Parent.Name
+    End If
+    GetParentName = parentName
+End Function
+
+Private Function GetControlName(ByVal ctrl As Object, ByVal prefix As String, ByVal useCls As Boolean) As String
+    Dim controlName As String
+    ' If the object name and type name of a control match, it is considered a UserForm.
+    If ctrl.Name = TypeName(ctrl) And useCls Then
+        controlName = prefix & FORM_WINDOW_NAME
+    Else
+        controlName = prefix & ctrl.Name
+    End If
+    GetControlName = controlName
 End Function
 
 Private Function GetBorderSetting(ByVal ctrl As Object) As String
@@ -363,15 +483,17 @@ Private Function GetBorderSetting(ByVal ctrl As Object) As String
             End Select
     End Select
 
-    r = ctrl.Name & ".configure(relief=" & relief & ", bd=" & borderWidth & ", highlightthickness=" & highlightBorderWidth & ", highlightbackground=" & q & hexBorderColor & q & ", highlightcolor=" & q & hexBorderColor & q & ")"
+    r = ".configure(relief=" & relief & ", bd=" & borderWidth & ", highlightthickness=" & highlightBorderWidth & ", highlightbackground=" & q & hexBorderColor & q & ", highlightcolor=" & q & hexBorderColor & q & ")"
     GetBorderSetting = r
 End Function
 
-Private Function GetTextAlignSetting(ByVal ctrl As Object) As String
+Private Function GetTextAlignSetting(ByVal ctrl As Object, ByVal indent As String, ByVal prefix As String, ByVal useCls As Boolean) As String
    Dim r As String
    Const q As String = """"
    Dim anchor As String
    Dim justify As String
+   Dim controlName As String
+   controlName = GetControlName(ctrl, prefix, useCls)
    r = ""
    
    Select Case ctrl.TextAlign
@@ -389,9 +511,9 @@ Private Function GetTextAlignSetting(ByVal ctrl As Object) As String
             justify = "center"
     End Select
     If Not ContainsValue(Array("TextBox", "ComboBox"), TypeName(ctrl)) Then
-        r = ctrl.Name & ".configure(anchor=" & q & anchor & q & ")" & vbLf
+        r = indent & controlName & ".configure(anchor=" & q & anchor & q & ")" & vbLf
     End If
-    r = r & ctrl.Name & ".configure(justify=" & q & justify & q & ")"
+    r = r & indent & controlName & ".configure(justify=" & q & justify & q & ")"
     GetTextAlignSetting = r
 End Function
 
@@ -475,25 +597,31 @@ Private Function GetControlCursorType(ByVal ctrl As Object) As String
     GetControlCursorType = cursorType
 End Function
 
-Private Function SetTkRadiobuttonValues(ByVal ctrls As Variant) As String
+Private Function SetTkRadiobuttonValues(ByVal ctrls As Variant, ByVal indent As String, ByVal prefix As String, ByVal useCls As Boolean) As String
     Dim parentList As New Collection
     Const q As String = """"
     Dim varName As String
     Dim ctrl As Variant
     Dim r As String
+    Dim parentName As String
+    Dim controlName As String
+    Dim radioButtonStrValue As String
     r = ""
     For Each ctrl In ctrls
+        controlName = GetControlName(ctrl, prefix, useCls)
+        parentName = GetParentName(ctrl, prefix, useCls)
+        radioButtonStrValue = "StrVar_" & ctrl.Name
         If TypeName(ctrl) = "OptionButton" Then
-            varName = ctrl.Parent.Name & "_radiobutton_value"
-            If Not CollContainsKey(parentList, ctrl.Parent.Name) Then
+            varName = parentName & "_radiobutton_value"
+            If Not CollContainsKey(parentList, parentName) Then
                 ' Use the Collection key to check and avoid redeclaring a variable that has already been declared
-                parentList.Add "", ctrl.Parent.Name
-                r = r & varName & "= tk.StringVar()" & vbLf
-                r = r & varName & ".set(None)" & vbLf ' Deselect the radio button
+                parentList.Add "", parentName
+                r = r & indent & varName & " = tk.StringVar()" & vbLf
+                r = r & indent & varName & ".set(None)" & vbLf ' Deselect the radio button
             End If
-            r = r & ctrl.Name & ".configure(variable=" & varName & ", value=" & q & ctrl.Name & q & ")" & vbLf
+            r = r & indent & controlName & ".configure(variable=" & varName & ", value=" & q & radioButtonStrValue & q & ")" & vbLf
             If ctrl.value = True Then
-                r = r & varName & ".set(" & q & ctrl.Name & q & ")" & vbLf
+                r = r & indent & varName & ".set(" & q & radioButtonStrValue & q & ")" & vbLf
             End If
             
         End If
@@ -501,53 +629,61 @@ Private Function SetTkRadiobuttonValues(ByVal ctrls As Variant) As String
     SetTkRadiobuttonValues = r
 End Function
 
-Private Function SetTkCheckbuttonValues(ByVal ctrls As Variant) As String
+Private Function SetTkCheckbuttonValues(ByVal ctrls As Variant, ByVal indent As String, ByVal prefix As String, ByVal useCls As Boolean) As String
     Dim varName As String
     Dim ctrl As Variant
     Dim value As Boolean
     Dim r As String
+    Dim controlName As String
     r = ""
     For Each ctrl In ctrls
+        controlName = GetControlName(ctrl, prefix, useCls)
         If TypeName(ctrl) = "CheckBox" Or TypeName(ctrl) = "ToggleButton" Then
-            varName = ctrl.Name & "_checkbutton_value"
-            r = r & varName & "= tk.BooleanVar()" & vbLf
-            r = r & ctrl.Name & ".configure(variable=" & varName & ")" & vbLf
+            varName = controlName & "_checkbutton_value"
+            r = r & indent & varName & " = tk.BooleanVar()" & vbLf
+            r = r & indent & controlName & ".configure(variable=" & varName & ")" & vbLf
             If ctrl.value = True Then
                 value = True
             Else
                 value = False
             End If
-            r = r & varName & ".set(" & value & ")" & vbLf
+            r = r & indent & varName & ".set(" & value & ")" & vbLf
             
         End If
     Next
     SetTkCheckbuttonValues = r
 End Function
 
-Private Function GetListBoxValue(ByVal ctrl As Object) As String
+Private Function GetListBoxValue(ByVal ctrl As Object, ByVal indent As String) As String
     ' Retrieve the items of a ListBox or ComboBox as a string in the format ["1", "2", "3"].
     Const q As String = """"
     Dim item As Variant
     Dim i As Long: i = 0
     Dim r As String
-    Const indent As String = "    "
+    Dim listIndent As String: listIndent = "    " & indent
     Const maxItemsPerLine As Long = 3
     r = ""
     If ctrl.ListCount > 0 Then
-        If ctrl.ListCount > maxItemsPerLine Then r = r & vbLf & indent
+        If ctrl.ListCount > maxItemsPerLine Then r = r & vbLf & listIndent
         For Each item In ctrl.List
             i = i + 1
             r = r & q & Convert2PythonFormatText(item) & q
             If Not i = ctrl.ListCount Then
                 r = r & ", "
-                If i Mod maxItemsPerLine = 0 And ctrl.ListCount > maxItemsPerLine Then r = r & vbLf & indent
+                If i Mod maxItemsPerLine = 0 And ctrl.ListCount > maxItemsPerLine Then r = r & vbLf & listIndent
             Else
                 If ctrl.ListCount > maxItemsPerLine Then r = r & vbLf
                 Exit For
             End If
         Next item
     End If
-    r = "[" & r & "]"
+    
+    If ctrl.ListCount > maxItemsPerLine Then
+        r = "[" & r & indent & "]"
+    Else
+        r = "[" & r & "]"
+    End If
+    
     GetListBoxValue = r
 End Function
 
@@ -840,6 +976,11 @@ End Function
 Private Function GenerateUnsupportedControlMessage(ByVal ctrl As Object) As String
     Const q As String = """"
     GenerateUnsupportedControlMessage = "Control type " & q & TypeName(ctrl) & q & " is not supported."
+End Function
+
+Private Function GenerateUnavailableNameMessage(ByVal ctrl As Object) As String
+    Const q As String = """"
+    GenerateUnavailableNameMessage = "Object Name " & q & ctrl.Name & q & "is not available." & vbLf & "Please use a different name instead."
 End Function
 
 Private Function GetFormControlDepth(ByVal ctrl As Object) As Long

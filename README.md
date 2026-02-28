@@ -20,39 +20,39 @@ This program converts userforms created in Microsoft Excel VBA into Python Tkint
 - Variable names (object names)
 - Approximate layout and size of controls
 - Control colors (foreground, background)
-- Text display (Label, CommandButton, CheckBox, ToggleButton, OptionButton, MultiPage)
+- Text display (`Label`, `CommandButton`, `CheckBox`, `ToggleButton`, `OptionButton`, `MultiPage`)
 - Font (typeface, size, bold, italic)
-- Borders (UserForm, Frame, TextBox, Label, ListBox, Image)
+- Borders (`UserForm`, `Frame`, `TextBox`, `Label`, `ListBox`, `Image`)
 - Mouse cursor
-- Text alignment: left, center, right (Label, TextBox [MultiLine=False], ComboBox, CheckBox, ToggleButton, OptionButton)
-- Default values of TextBox, ComboBox
-- Items set in ComboBox, ListBox
-- Selection state of OptionButton, CheckBox and ToggleButton
-- Transparent background setting specified in BackStyle
+- Text alignment: left, center, right (`Label`, `TextBox` [MultiLine=False], `ComboBox`, `CheckBox`, `ToggleButton`, `OptionButton`)
+- Default values of `TextBox`, `ComboBox`
+- Items set in `ComboBox`, `ListBox`
+- Selection state of `OptionButton`, `CheckBox` and `ToggleButton`
+- Transparent background setting specified in `.BackStyle`
 
 ## Supported Controls
 | VBA Form Class | Tkinter Class|
 | ------ | ------ |
-| Label | tk.Label |
-| CommandButton | tk.Button |
-| Frame (without Caption) | tk.Frame |
-| Frame (with any Caption) | tk.LabelFrame |
-| TextBox (MultiLine=False) | tk.Entry |
-| TextBox (MultiLine=True) | tk.Text |
-| SpinButton | tk.Spinbox |
-| ListBox | tk.Listbox |
-| CheckBox | tk.Checkbutton |
-| ToggleButton | tk.Checkbutton(indicatoron=0) |
-| OptionButton | tk.Radiobutton |
-| Image | tk.Canvas |
-| ScrollBar | ttk.Scale |
-| ComboBox | ttk.Combobox |
-| MultiPage | ttk.Notebook |
+| `Label` | `tk.Label` |
+| `CommandButton` | `tk.Button` |
+| `Frame` (without Caption) | `tk.Frame` |
+| `Frame` (with any Caption) | `tk.LabelFrame` |
+| `TextBox` (`MultiLine=False`) | `tk.Entry` |
+| `TextBox` (`MultiLine=True`) | `tk.Text` |
+| `SpinButton` | `tk.Spinbox` |
+| `ListBox` | `tk.Listbox` |
+| `CheckBox` | `tk.Checkbutton` |
+| `ToggleButton` | `tk.Checkbutton`(`indicatoron=0`) |
+| `OptionButton` | `tk.Radiobutton` |
+| `Image` | `tk.Canvas` |
+| `ScrollBar` | `ttk.Scale` |
+| `ComboBox` | `ttk.Combobox` |
+| `MultiPage` | `ttk.Notebook` |
 
 
 > Note:
-SpinButton behaves differently in VBA and Tkinter, so appearance may vary depending on placement.<br>
-ScrollBar in VBA has up/down adjustment buttons, but Tkinter’s Scale does not.<br>
+`SpinButton` behaves differently in VBA and Tkinter, so appearance may vary depending on placement.<br>
+`ScrollBar` in VBA has up/down adjustment buttons, but Tkinter’s `Scale` does not.<br>
 If unsupported controls exist on the form, the conversion will fail. If that case, please remove those controls and run the conversion again.<br>
 
 
@@ -61,28 +61,50 @@ If unsupported controls exist on the form, the conversion will fail. If that cas
 Before using, prepare the Excel workbook containing the user form you want to convert.
 Also, ensure that the Immediate Window is visible in the VBE (Visual Basic Editor).<br><br>
 <img width="843" height="768" alt="Image" src="https://github.com/user-attachments/assets/676cd54c-d610-4c25-bd9a-9e064e38dc5e" /><br><br>
-1. Download the latest file from [here](https://github.com/GUI-Conversion-Tools/VBAForm2Tkinter/releases) and extract it. Use the VBAForm2Tkinter.bas file inside.<br>
+1. Download the latest file from [here](https://github.com/GUI-Conversion-Tools/VBAForm2Tkinter/releases) and extract it. Use the `VBAForm2Tkinter.bas` file inside.<br>
 2. In Excel, go to Developer -> Visual Basic to open VBE.<br>
-3. Right-click your project and import the provided .bas file using Import File.<br>
-4. In the Immediate Window, enter: Call ConvertForm2Tkinter(UserForm1)<br>
+3. Right-click your project and import the provided `.bas` file using Import File.<br>
+4. In the Immediate Window, enter: `Call ConvertForm2Tkinter(UserForm1)`<br>
 ```vb
 Call ConvertForm2Tkinter(UserForm1)
 ```
-   > Note: Replace UserForm1 with the object name of the form you want to convert.
+   > Note: Replace `UserForm1` with the object name of the form you want to convert.
 
-5.  If conversion succeeds, a message will appear, and an output.py file will be created in the same directory as your Excel workbook.<br>
-6.  After checking the GUI appearance, edit the .py file and, above .mainloop(), configure event handlers for controls (e.g., button.configure(command=...)).<br>
+5.  If conversion succeeds, a message will appear, and an `output.py` file will be created in the same directory as your Excel workbook.<br>
+6.  After checking the GUI appearance, edit the `.py` file and, above `.mainloop()`, configure event handlers for controls (e.g., `button.configure(command=...)`).<br>
 
+## Parameters
+
+`ConvertForm2Tkinter` accepts the following parameters:
+
+|**Parameter**|**Type**|**Description**                         |
+|----------------|-------------------------------|-----------------------------|
+|`frms` |`Variant`|**Required.** Accepts a single `UserForm` object or an `Array` of `UserForm` objects to be converted.            |
+|`useCls`  |`Boolean` |**Optional (Default: `False`).** If set to `True`, the generated Python code will wrap each form in a Python class structure. This is automatically set to `True` if `frms` is an array.|
+|`noMainLoop`  |`Boolean`|**Optional (Default: `False`).** If set to `True`, the `.mainloop()` call will be omitted from the end of the generated Python script.|
+
+You can execute the conversion by calling the `ConvertForm2Tkinter` with a single UserForm object or an array of multiple UserForms.
+
+```vb
+' Example: Converting a single form
+Call ConvertForm2Tkinter(UserForm1)
+
+' Example: Converting a single form (Class-based style)
+Call ConvertForm2Tkinter(UserForm1, useCls:=True)
+
+' Example: Converting multiple forms (Automatically uses Class-based style)
+Call ConvertForm2Tkinter(Array(UserForm1, UserForm2))
+```
 
 ## Control Order (for Controls Without Child Elements)
-In Tkinter, if you place one Label on top of another, the later widget appears in front.<br>
+In Tkinter, if you place one `Label` on top of another, the later widget appears in front.<br>
 However, in VBA, you can change front/back order, so the behavior differs.<br>
 The program first sorts controls by hierarchy level; however, it preserves the original creation order within the same hierarchy.<br>
 Since VBA’s z-order (front/back) cannot currently be retrieved, some displays may not match VBA.<br>
 
 To adjust:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;Edit the Python code so the widget you want in front is placed later, or Reorder the controls in VBA before conversion.<br>
-&nbsp;&nbsp;&nbsp;&nbsp;For new GUIs, instead of overlapping controls, it is recommended to use containers like Frame, which allow clear parent-child relationships.
+&nbsp;&nbsp;&nbsp;&nbsp;For new GUIs, instead of overlapping controls, it is recommended to use containers like `Frame`, which allow clear parent-child relationships.
 
 ## Notes on Usage
 When using this program in a multi-monitor environment, please temporarily switch to a single monitor or ensure that all monitors have the same scaling percentage.
