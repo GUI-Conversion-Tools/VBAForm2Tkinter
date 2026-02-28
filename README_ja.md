@@ -75,9 +75,9 @@ Call ConvertForm2Tkinter(UserForm1)
 
 |**引数**|**型**|**説明**                         |
 |----------------|-------------------------------|-----------------------------|
-|`frms` |`Variant`|**必須** 変換対象の`UserForm`オブジェクトまたは`UserForm`オブジェクトの配列を指定 |
-|`useCls`  |`Boolean` |**省略可能 (デフォルト: `False`).** `True`にした場合生成したPythonコードにおいて各フォームをクラス化する `frms`が配列の場合は自動的に`True`に設定される|
-|`noMainLoop`  |`Boolean`|**省略可能 (デフォルト: `False`).** `True`にした場合生成したPythonコードに`.mainloop()`を含めなくする|
+|`frms` |`Variant`|**必須**<br>変換対象の`UserForm`オブジェクトまたは`UserForm`オブジェクトの配列を指定 |
+|`useCls`  |`Boolean` |**省略可能 (デフォルト: `False`)** <br>`True`にした場合生成したPythonコードにおいて各フォームをクラス化する &nbsp;&nbsp;`frms`が配列の場合は自動的に`True`に設定される|
+|`noMainLoop`  |`Boolean`|**省略可能 (デフォルト: `False`)** <br>`True`にした場合生成したPythonコードに`.mainloop()`を含めなくする|
 
 `ConvertForm2Tkinter`は単一のユーザーフォームまたは配列内の複数のユーザーフォームを変換することが可能です
 
