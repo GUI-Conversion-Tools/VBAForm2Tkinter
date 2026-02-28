@@ -79,9 +79,9 @@ Call ConvertForm2Tkinter(UserForm1)
 
 |**Parameter**|**Type**|**Description**                         |
 |----------------|-------------------------------|-----------------------------|
-|`frms` |`Variant`|**Required.** Accepts a single `UserForm` object or an `Array` of `UserForm` objects to be converted.            |
-|`useCls`  |`Boolean` |**Optional (Default: `False`).** If set to `True`, the generated Python code will wrap each form in a Python class structure. This is automatically set to `True` if `frms` is an array.|
-|`noMainLoop`  |`Boolean`|**Optional (Default: `False`).** If set to `True`, the `.mainloop()` call will be omitted from the end of the generated Python script.|
+|`frms` |`Variant`|**Required.**<br>Accepts a single `UserForm` object or an `Array` of `UserForm` objects to be converted.            |
+|`useCls`  |`Boolean` |**Optional (Default: `False`).**<br>If set to `True`, the generated Python code will wrap each form in a Python class structure. This is automatically set to `True` if `frms` is an array.|
+|`noMainLoop`  |`Boolean`|**Optional (Default: `False`).**<br>If set to `True`, the `.mainloop()` call will be omitted from the end of the generated Python script.|
 
 You can execute the conversion by calling the `ConvertForm2Tkinter` with a single UserForm object or an array of multiple UserForms.
 
