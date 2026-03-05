@@ -1,6 +1,6 @@
 Attribute VB_Name = "VBAForm2Tkinter"
 
-' VBAForm2Tkinter v1.3.0
+' VBAForm2Tkinter v1.3.1
 ' https://github.com/GUI-Conversion-Tools/VBAForm2Tkinter
 ' Copyright (c) 2025-2026 ZeeZeX
 ' This software is released under the MIT License.
@@ -54,7 +54,7 @@ Sub ConvertForm2Tkinter(ByVal frms As Variant, Optional ByVal useCls As Boolean 
     Dim code As String
     Dim filePath As String
     Dim saveDir As String
-    code = VBAForm2Tkinter(frms, useCls, noMainLoop)
+    code = GenerateTkinterCode(frms, useCls, noMainLoop)
     If code <> "" Then
         If ThisWorkbook.Path = "" Then
             saveDir = "C:"
@@ -71,7 +71,7 @@ Sub ConvertForm2Tkinter(ByVal frms As Variant, Optional ByVal useCls As Boolean 
 End Sub
 
 
-Function VBAForm2Tkinter(ByVal frms As Variant, Optional ByVal useCls As Boolean = False, Optional ByVal noMainLoop As Boolean = False) As String
+Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls As Boolean = False, Optional ByVal noMainLoop As Boolean = False) As String
     Dim root As Variant
     Dim indent As String
     Dim prefix As String
@@ -141,7 +141,7 @@ Function VBAForm2Tkinter(ByVal frms As Variant, Optional ByVal useCls As Boolean
         If ContainsValue(unavailableNames, LCase(root.Name)) Then
             MsgBox GenerateUnavailableNameMessage(root)
             r = ""
-            VBAForm2Tkinter = r
+            GenerateTkinterCode = r
             Exit Function
         End If
         unavailableNames(0) = LCase(FORM_WINDOW_NAME)
@@ -205,7 +205,7 @@ Function VBAForm2Tkinter(ByVal frms As Variant, Optional ByVal useCls As Boolean
             If ContainsValue(unavailableNames, LCase(ctrl.Name)) Then
                 MsgBox GenerateUnavailableNameMessage(ctrl)
                 r = ""
-                VBAForm2Tkinter = r
+                GenerateTkinterCode = r
                 Exit Function
             End If
             
@@ -399,7 +399,7 @@ Function VBAForm2Tkinter(ByVal frms As Variant, Optional ByVal useCls As Boolean
             Else
                 MsgBox GenerateUnsupportedControlMessage(ctrl)
                 r = ""
-                VBAForm2Tkinter = r
+                GenerateTkinterCode = r
                 Exit Function
             End If
         Next ctrl
@@ -424,7 +424,7 @@ Function VBAForm2Tkinter(ByVal frms As Variant, Optional ByVal useCls As Boolean
         Next
         r = r & toplevelInstanceName & "." & FORM_WINDOW_NAME & ".mainloop()"
     End If
-    VBAForm2Tkinter = r
+    GenerateTkinterCode = r
 End Function
 
 Private Function GetParentName(ByVal ctrl As Object, ByVal prefix As String, ByVal useCls As Boolean) As String
@@ -980,7 +980,7 @@ End Function
 
 Private Function GenerateUnavailableNameMessage(ByVal ctrl As Object) As String
     Const q As String = """"
-    GenerateUnavailableNameMessage = "Object Name " & q & ctrl.Name & q & "is not available." & vbLf & "Please use a different name instead."
+    GenerateUnavailableNameMessage = "Object Name " & q & ctrl.Name & q & " is not available." & vbLf & "Please use a different name instead."
 End Function
 
 Private Function GetFormControlDepth(ByVal ctrl As Object) As Long
