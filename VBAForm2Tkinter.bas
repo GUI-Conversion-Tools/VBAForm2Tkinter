@@ -1,6 +1,6 @@
 Attribute VB_Name = "VBAForm2Tkinter"
 
-' VBAForm2Tkinter v1.3.1
+' VBAForm2Tkinter v1.3.2
 ' https://github.com/GUI-Conversion-Tools/VBAForm2Tkinter
 ' Copyright (c) 2025-2026 ZeeZeX
 ' This software is released under the MIT License.
@@ -838,7 +838,7 @@ Private Function GetUserFormScaleFactorsAndOffsets(ByVal frm As Object) As Varia
     hwnd = Win32_FindWindowW("", tempFrmTitle)
     frm.caption = originalFrmTitle
     
-    If CLng(hwnd) = 0 Then
+    If hwnd = 0 Then
         Err.Raise Number:=513, Description:="Failed to get HWND."
     End If
     
