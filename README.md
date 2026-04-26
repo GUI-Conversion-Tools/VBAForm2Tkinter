@@ -8,7 +8,7 @@ This program converts userforms created in Microsoft Excel VBA into Python Tkint
 
 ## System Requirements
 - Supported OS: Windows
-- Required Software: Microsoft Excel
+- Required Software: Microsoft Excel 2010 or later
 
 ## Verified Operating Environments
 - Windows 10/11
@@ -19,16 +19,31 @@ This program converts userforms created in Microsoft Excel VBA into Python Tkint
 ## Converted Elements
 - Variable names (object names)
 - Approximate layout and size of controls
-- Control colors (foreground, background)
+- Control colors (foreground)
+- Control colors (background)
 - Text display (`Label`, `CommandButton`, `CheckBox`, `ToggleButton`, `OptionButton`, `MultiPage`)
 - Font (typeface, size, bold, italic)
 - Borders (`UserForm`, `Frame`, `TextBox`, `Label`, `ListBox`, `Image`)
 - Mouse cursor
-- Text alignment: left, center, right (`Label`, `TextBox` [MultiLine=False], `ComboBox`, `CheckBox`, `ToggleButton`, `OptionButton`)
+- Text alignment: left, center, right (`Label`, `TextBox` [.MultiLine=False], `ComboBox`, `CheckBox`, `ToggleButton`, `OptionButton`)
 - Default values of `TextBox`, `ComboBox`
 - Items set in `ComboBox`, `ListBox`
 - Selection state of `OptionButton`, `CheckBox` and `ToggleButton`
-- Transparent background setting specified in `.BackStyle`
+- Transparent background setting specified in `.BackStyle`(`Label`, `TextBox`, `CommandButton`, `CheckBox`, `ToggleButton`, `OptionButton`, `Image`, `ComboBox`)
+- `.TabOrientation` property (`MultiPage`)
+- `.Locked` property (`TextBox`, `ListBox`, `ComboBox`)
+- `.PasswordChar` property (`TextBox` [.MultiLine=False])
+- `.Style` property (`ComboBox`, `MultiPage`)
+- `.MultiSelect` property (`ListBox`)
+- `.PictureAlignment` property (`Image`)
+
+
+Note:  
+When `.BackStyle = fmBackStyleTransparent`, true transparency is not supported in Tkinter. Instead, the background color is substituted as follows:
+
+-   If the parent control has a `.BackColor`, that color is used.
+-   If the parent is a `Page` (which does not expose `.BackColor`), a system default color (`&H8000000F&`) is used as a fallback, which matches the visual background color of the `Page`.
+
 
 ## Supported Controls
 | VBA Form Class | Tkinter Class|
@@ -81,7 +96,8 @@ Call ConvertForm2Tkinter(UserForm1)
 |----------------|-------------------------------|-----------------------------|
 |`frms` |`Variant`|**Required.**<br>Accepts a single `UserForm` object or an `Array` of `UserForm` objects to be converted.            |
 |`useCls`  |`Boolean` |**Optional (Default: `False`).**<br>If set to `True`, the generated Python code will wrap each form in a Python class structure. This is automatically set to `True` if `frms` is an array.|
-|`noMainLoop`  |`Boolean`|**Optional (Default: `False`).**<br>If set to `True`, the `.mainloop()` call will be omitted from the end of the generated Python script.|
+|`noMainLoop`  |`Boolean`|**Optional (Default: `False`).**<br>If set to `True`, the `.mainloop()` call will be omitted from the end of the generated Python script. When `useCls` is also `True`, this will additionally skip the code that creates the object instances (e.g., `obj_UserForm1 = UserForm1()`).|
+|`uniqueStyleName`  |`Boolean`|**Optional (Default: `True`).**<br>If set to `True` (default), a unique suffix (UUID-based) will be appended to each ttk style name. This prevents styling conflicts when multiple forms or widgets of the same type are converted and run in the same Python environment.|
 
 You can execute the conversion by calling the `ConvertForm2Tkinter` with a single UserForm object or an array of multiple UserForms.
 

@@ -8,7 +8,7 @@
 
 ## 動作要件
 - 対応OS: Windows
-- 必要ソフトウェア: Microsoft Excel
+- 必要ソフトウェア: Microsoft Excel 2010以降
 
 ## 動作確認済環境
 - Windows 10/11
@@ -19,16 +19,28 @@
 ## 反映する項目
 - 変数名(オブジェクト名)
 - コントロールのおおよそのレイアウトとサイズ
-- コントロールの色(文字色、背景色)
+- コントロールの色(文字色)
+- コントロールの色(背景色)
 - テキスト表示(`Label`, `CommandButton`, `CheckBox`, `ToggleButton`, `OptionButton`, `MultiPage`)
 - フォント(フォント種類、サイズ、太字、斜体)
 - 枠線(`UserForm`, `Frame`, `TextBox`, `Label`, `ListBox`, `Image`)
 - マウスカーソル
-- テキスト表示の左寄せ・中央・右寄せ(`Label`, `TextBox` [MultiLine=False], `ComboBox`, `CheckBox`, `ToggleButton`, `OptionButton`)
+- テキスト表示の左寄せ・中央・右寄せ(`Label`, `TextBox` [.MultiLine=False], `ComboBox`, `CheckBox`, `ToggleButton`, `OptionButton`)
 - `TextBox`, `ComboBox`のデフォルト値
 - `ComboBox`, `ListBox`に設定したアイテム
 - `OptionButton`, `CheckBox`, `ToggleButton`の選択状態
-- `BackStyle`に設定した透明表示設定
+- `BackStyle`に設定した透明表示設定 (`Label`, `TextBox`, `CommandButton`, `CheckBox`, `ToggleButton`, `OptionButton`, `Image`, `ComboBox`)
+- `.TabOrientation`プロパティ (`MultiPage`)
+- `.Locked`プロパティ (`TextBox`, `ListBox`, `ComboBox`)
+- `.PasswordChar`プロパティ (`TextBox` [.MultiLine=False])
+- `.Style`プロパティ (`ComboBox`, `MultiPage`)
+- `.MultiSelect`プロパティ (`ListBox`)
+- `.PictureAlignment`プロパティ (`Image`)
+
+※ `.BackStyle = fmBackStyleTransparent`の場合、Tkinterではウィジェットの背景色の透過がサポートされていないため以下のように変換されます
+
+-   親コントロールが`.BackColor`プロパティを持つ場合、その色を`.BackColor`に設定します
+-   親コントロールが`Page`の場合、`.BackColor`プロパティを持たないため`Page`の視覚的な背景色と一致するシステムカラーの`&H8000000F&`を`.BackColor`に設定します
 
 ## 対応しているコントロールの種類
 | VBA Formのクラス | Tkinterのクラス|
@@ -77,7 +89,8 @@ Call ConvertForm2Tkinter(UserForm1)
 |----------------|-------------------------------|-----------------------------|
 |`frms` |`Variant`|**必須**<br>変換対象の`UserForm`オブジェクトまたは`UserForm`オブジェクトの配列を指定 |
 |`useCls`  |`Boolean` |**省略可能 (デフォルト: `False`)** <br>`True`にした場合生成したPythonコードにおいて各フォームをクラス化する &nbsp;&nbsp;`frms`が配列の場合は自動的に`True`に設定される|
-|`noMainLoop`  |`Boolean`|**省略可能 (デフォルト: `False`)** <br>`True`にした場合生成したPythonコードに`.mainloop()`を含めなくする|
+|`noMainLoop`  |`Boolean`|**省略可能 (デフォルト: `False`)** <br>`True`にした場合生成したPythonコードに`.mainloop()`を含めなくする &nbsp;&nbsp;`useCls`が`True`の場合はインスタンスの作成(例:`obj_UserForm1 = UserForm1()`)もスキップする|
+|`uniqueStyleName`  |`Boolean`|**省略可能 (デフォルト: `True`)**<br>`True`(デフォルト)にした場合、UUIDベースのユニークな識別子をttkの各スタイル名に付与する、これは同じ種類のフォームやウィジェットが複数変換され、同じPython環境内で実行された場合のスタイル名衝突を防ぐ役割を持つ |
 
 `ConvertForm2Tkinter`は単一のユーザーフォームまたは配列内の複数のユーザーフォームを変換することが可能です
 
