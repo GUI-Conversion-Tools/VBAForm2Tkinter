@@ -38,11 +38,10 @@ This program converts userforms created in Microsoft Excel VBA into Python Tkint
 - `.PictureAlignment` property (`Image`)
 
 
-Note:  
-When `.BackStyle = fmBackStyleTransparent`, true transparency is not supported in Tkinter. Instead, the background color is substituted as follows:
-
--   If the parent control has a `.BackColor`, that color is used.
--   If the parent is a `Page` (which does not expose `.BackColor`), a system default color (`&H8000000F&`) is used as a fallback, which matches the visual background color of the `Page`.
+> Note:  
+> When `.BackStyle = fmBackStyleTransparent`, true transparency is not supported in Tkinter. Instead, the background color is substituted as follows:
+> -   If the parent control has a `.BackColor`, that color is used.
+> -   If the parent is a `Page` (which does not expose `.BackColor`), a system default color (`&H8000000F&`) is used as a fallback, which matches the visual background color of the `Page`.
 
 
 ## Supported Controls
