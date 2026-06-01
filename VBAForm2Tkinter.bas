@@ -1,6 +1,6 @@
 Attribute VB_Name = "VBAForm2Tkinter"
 
-' VBAForm2Tkinter v1.3.4
+' VBAForm2Tkinter v1.4.0
 ' https://github.com/GUI-Conversion-Tools/VBAForm2Tkinter
 ' Copyright (c) 2025-2026 ZeeZeX
 ' This software is released under the MIT License.
@@ -12,23 +12,9 @@ Option Explicit
 #If VBA7 Then
     ' 64bit Office / VBA7 or later
     Private Declare PtrSafe Function GetSysColor Lib "user32" (ByVal nIndex As Long) As Long
-    Private Declare PtrSafe Function FindWindowW Lib "user32" (ByVal lpClassName As LongPtr, ByVal lpWindowName As LongPtr) As LongPtr
-    Private Declare PtrSafe Function GetClientRect Lib "user32" (ByVal hwnd As LongPtr, lpRect As RECT) As Long
-    Private Declare PtrSafe Function GetWindowRect Lib "user32" (ByVal hwnd As LongPtr, lpRect As RECT) As Long
-    Private Type RECT: Left As Long: Top As Long: Right As Long: Bottom As Long: End Type
-    Private Declare PtrSafe Function GetDC Lib "user32" (ByVal hwnd As LongPtr) As LongPtr
-    Private Declare PtrSafe Function ReleaseDC Lib "user32" (ByVal hwnd As LongPtr, ByVal hdc As LongPtr) As Long
-    Private Declare PtrSafe Function GetDeviceCaps Lib "gdi32" (ByVal hdc As LongPtr, ByVal nIndex As Long) As Long
 #Else
     ' 32bit Office
     Private Declare Function GetSysColor Lib "user32" (ByVal nIndex As Long) As Long
-    Private Declare Function FindWindowW Lib "user32" (ByVal lpClassName As Long, ByVal lpWindowName As Long) As Long
-    Private Declare Function GetClientRect Lib "user32" (ByVal hwnd As Long, lpRect As RECT) As Long
-    Private Declare Function GetWindowRect Lib "user32" (ByVal hwnd As Long, lpRect As RECT) As Long
-    Private Type RECT: Left As Long: Top As Long: Right As Long: Bottom As Long: End Type
-    Private Declare Function GetDC Lib "user32" (ByVal hwnd As Long) As Long
-    Private Declare Function ReleaseDC Lib "user32" (ByVal hwnd As Long, ByVal hdc As Long) As Long
-    Private Declare Function GetDeviceCaps Lib "gdi32" (ByVal hdc As Long, ByVal nIndex As Long) As Long
 #End If
 
 Private Const FORM_WINDOW_NAME As String = "window"
@@ -96,11 +82,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
     Const q As String = """"
     Dim fontStyle As String
     Dim fontOpts As String
-    Dim widgetType As String
     Dim styleName As String
-    Dim sizeFactorsAndOffsets() As Variant
-    Dim sizeFactorX As Double
-    Dim sizeFactorY As Double
     Dim pixelWidth As Long
     Dim pixelHeight As Long
     Dim pixelTop As Long
@@ -109,17 +91,22 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
     Dim orientation As String
     Dim cursorType As String
     Dim caption As String
-    Dim dpis() As Variant
-    Dim scaleFactorX As Double
-    Dim scaleFactorY As Double
     Dim colorCode As String
     Dim ttkStyleRef As String
-    Dim tabFontStyles As Collection
-    Dim tabFontStyleSetting As String
-    Dim TabOrientation As String
+    Dim tabPosition As String
     Dim canvasCoordX As String
     Dim canvasCoordY As String
     Dim canvasAnchor As String
+    Dim listviewHeaderNames As String
+    Dim ttkFontSetting As String
+    Dim rowHeight As Double
+    Dim rowPixelHeight As Long
+    Dim treeviewNodes As Collection
+    Dim node As Object
+    Dim nodeDictName As String
+    Dim nodeVarName As String
+    Dim nodeParentVarName As String
+    Dim enableScrollBar As Boolean
     
     r = ""
     
@@ -143,7 +130,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
     r = r & vbLf
     
     For Each root In frms
-        unavailableNames = VBA.Array("", "tk", "ttk", "font", "style", "int")
+        unavailableNames = VBA.Array("", "tk", "ttk", "font", "style", "int", "item")
         
         For i = LBound(unavailableNames) To UBound(unavailableNames)
             unavailableNames(i) = LCase(unavailableNames(i))
@@ -157,22 +144,9 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
         End If
         unavailableNames(0) = LCase(FORM_WINDOW_NAME)
         
-        dpis = GetPrimaryMonitorDPI
-        scaleFactorX = dpis(0) / 96
-        scaleFactorY = dpis(1) / 96
-        
-        ' Get factor for size conversion
-        sizeFactorsAndOffsets = GetUserFormScaleFactorsAndOffsets(root)
-        sizeFactorX = sizeFactorsAndOffsets(0)
-        sizeFactorY = sizeFactorsAndOffsets(1)
         ' Convert UserForm's size to pixel size
-        pixelWidth = UserFormSizeToPixel(root.Width, sizeFactorX)
-        pixelHeight = UserFormSizeToPixel(root.Height, sizeFactorY)
-        pixelWidth = pixelWidth - sizeFactorsAndOffsets(2)
-        pixelHeight = pixelHeight - sizeFactorsAndOffsets(3)
-        ' Divide window size by scaling factor
-        pixelWidth = Round(pixelWidth / scaleFactorX)
-        pixelHeight = Round(pixelHeight / scaleFactorY)
+        pixelWidth = UserFormSizeToPixel(root.InsideWidth)
+        pixelHeight = UserFormSizeToPixel(root.InsideHeight)
         
         formName = GenerateCtrlVarName(root, prefix, useCls)
         
@@ -198,8 +172,6 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
         cursorType = GetControlCursorType(root)
         If cursorType <> "" Then
             r = r & indent & formName & ".configure(cursor=" & q & cursorType & q & ")" & vbLf
-        Else
-            r = r & indent & formName & ".configure(cursor=" & "None" & ")" & vbLf
         End If
         
         r = r & vbLf
@@ -211,6 +183,8 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
             controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
             parentVarName = GenerateCtrlVarName(ctrl.Parent, prefix, useCls)
             itemsListName = controlVarName & "_items_value"
+            listviewHeaderNames = controlVarName & "_listview_headers"
+            enableScrollBar = False
             
             ' Generate unique style name to prevent naming conflicts.
             If uniqueStyleName Then
@@ -229,34 +203,22 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
             End If
             
             If GetTkWidgetName(ctrl) <> "" Then
-                widgetType = GetTkWidgetName(ctrl)
                 
-                ' For ttk widget
-                If ContainsValue(Array("Combobox", "Notebook", "Scale"), widgetType) Then
-                    widgetType = "ttk." & widgetType
-                Else
-                    widgetType = "tk." & widgetType
-                End If
+                pixelLeft = UserFormSizeToPixel(ctrl.Left)
+                pixelTop = UserFormSizeToPixel(ctrl.Top)
+                pixelWidth = UserFormSizeToPixel(ctrl.Width)
+                pixelHeight = UserFormSizeToPixel(ctrl.Height)
                 
-                pixelLeft = UserFormSizeToPixel(ctrl.Left, sizeFactorX)
-                pixelTop = UserFormSizeToPixel(ctrl.Top, sizeFactorY)
-                pixelWidth = UserFormSizeToPixel(ctrl.Width, sizeFactorX)
-                pixelHeight = UserFormSizeToPixel(ctrl.Height, sizeFactorY)
                 
-                pixelLeft = Round(pixelLeft / scaleFactorX)
-                pixelTop = Round(pixelTop / scaleFactorY)
-                pixelWidth = Round(pixelWidth / scaleFactorX)
-                pixelHeight = Round(pixelHeight / scaleFactorY)
-                
-                r = r & indent & controlVarName & " = " & widgetType & "(" & parentVarName & ")" & vbLf
+                r = r & indent & controlVarName & " = " & GetTkWidgetName(ctrl) & "(" & parentVarName & ")" & vbLf
                 r = r & indent & controlVarName & ".place(x=" & pixelLeft & ", y=" & pixelTop & ", width=" & pixelWidth & ", height=" & pixelHeight & ")" & vbLf
                 
-                If GetTkWidgetName(ctrl) = "LabelFrame" Or Not ContainsValue(Array("ComboBox", "Frame", "Image", "ScrollBar", "MultiPage"), TypeName(ctrl)) Then
+                If GetTkWidgetName(ctrl) = "tk.LabelFrame" Or ContainsValue(Array("Label", "CommandButton", "TextBox", "SpinButton", "ListBox", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
                     ' Set ForeColor
                     r = r & indent & controlVarName & ".configure(fg=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
                 End If
                 
-                If Not ContainsValue(Array("ComboBox", "MultiPage", "ScrollBar"), TypeName(ctrl)) Then
+                If ContainsValue(Array("Label", "CommandButton", "Frame", "TextBox", "SpinButton", "ListBox", "CheckBox", "ToggleButton", "OptionButton", "Image"), TypeName(ctrl)) Then
                     ' Set BackColor
                     colorCode = FormColorToHex(ctrl.BackColor)
                     If ContainsValue(Array("Label", "TextBox", "CommandButton", "CheckBox", "ToggleButton", "OptionButton", "Image"), TypeName(ctrl)) Then
@@ -285,7 +247,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                     
                 End If
                 
-                If GetTkWidgetName(ctrl) = "LabelFrame" Or ContainsValue(Array("Label", "CommandButton", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
+                If GetTkWidgetName(ctrl) = "tk.LabelFrame" Or ContainsValue(Array("Label", "CommandButton", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
                     caption = ctrl.caption
                     caption = Convert2PythonFormatText(caption)
                     r = r & indent & controlVarName & ".configure(text=" & q & caption & q & ")" & vbLf
@@ -293,7 +255,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                 
                 
                 If TypeName(ctrl) = "TextBox" Then
-                    If GetTkWidgetName(ctrl) = "Entry" Then
+                    If GetTkWidgetName(ctrl) = "tk.Entry" Then
                         r = r & indent & controlVarName & ".insert(0, " & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
                         If ctrl.PasswordChar <> "" Then
                             r = r & indent & controlVarName & ".configure(show=" & q & Left(ctrl.PasswordChar, 1) & q & ")" & vbLf
@@ -303,11 +265,15 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                              r = r & indent & controlVarName & ".configure(state=" & q & "readonly" & q & ")" & vbLf
                         End If
                         
-                    ElseIf GetTkWidgetName(ctrl) = "Text" Then
+                    ElseIf GetTkWidgetName(ctrl) = "tk.Text" Then
                         r = r & indent & controlVarName & ".insert(" & q & "1.0" & q & ", " & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
                         
                         If ctrl.Locked Then
                              r = r & indent & controlVarName & ".configure(state=" & q & "disabled" & q & ")" & vbLf
+                        End If
+                        
+                        If Not ctrl.WordWrap Then
+                            r = r & indent & controlVarName & ".configure(wrap=" & q & "none" & q & ")" & vbLf
                         End If
                         
                     End If
@@ -364,6 +330,8 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                          r = r & indent & controlVarName & ".configure(disabledforeground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
                     End If
                     
+                    r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, True)
+                    
                 End If
                 
                 If TypeName(ctrl) = "ScrollBar" Then
@@ -389,20 +357,67 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                     
                 End If
                 
+                If IsListView(ctrl) Then
+                    styleName = tkStyleBaseName & ".Treeview"
+                    rowHeight = GetTextSizeFromCtrlFontSetting(ctrl, "TEST")(1)
+                    rowPixelHeight = UserFormSizeToPixel(rowHeight)
+                    ttkFontSetting = GenerateTtkFontSetting(ctrl)
+                    r = r & indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
+                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & " + "".Heading""" & ", " & ttkFontSetting & ")" & vbLf
+                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", " & ttkFontSetting & ")" & vbLf
+                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", rowheight=" & rowPixelHeight & ")" & vbLf
+                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", foreground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
+                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
+                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", fieldbackground=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
+                    r = r & indent & listviewHeaderNames & " = " & GenerateListViewHeaders(ctrl) & vbLf
+                    r = r & indent & controlVarName & ".configure(columns=" & listviewHeaderNames & ",show=" & q & "headings" & q & ")" & vbLf
+                    r = r & DefineListViewColumns(ctrl, indent, prefix, useCls) & vbLf
+                    r = r & indent & itemsListName & " = " & GetListViewItems(ctrl, indent) & vbLf
+                    r = r & indent & "for item in " & itemsListName & ":" & vbLf
+                    r = r & indent & "    " & controlVarName & ".insert("""", tk.END, values=item)" & vbLf
+                    r = r & SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                    r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                End If
+                
+                If IsTreeView(ctrl) Then
+                    styleName = tkStyleBaseName & ".Treeview"
+                    rowHeight = GetTextSizeFromCtrlFontSetting(ctrl, "TEST")(1)
+                    rowPixelHeight = UserFormSizeToPixel(rowHeight)
+                    nodeDictName = controlVarName & "_node_dict"
+                    ttkFontSetting = GenerateTtkFontSetting(ctrl)
+                    r = r & indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
+                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", " & ttkFontSetting & ")" & vbLf
+                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", rowheight=" & rowPixelHeight & ")" & vbLf
+                    Set treeviewNodes = GetAllTreeViewNodesBfs(ctrl)
+                    r = r & indent & controlVarName & ".configure(show=" & q & "tree" & q & ")" & vbLf
+                    r = r & indent & nodeDictName & " = {}" & vbLf
+                    For Each item In treeviewNodes
+                        Set node = item(0)
+                        nodeVarName = nodeDictName & "[" & q & Convert2PythonFormatText(node.Key) & q & "]"
+                        If node.Parent Is Nothing Then
+                            nodeParentVarName = q & q
+                        Else
+                            nodeParentVarName = nodeDictName & "[" & q & Convert2PythonFormatText(node.Parent.Key) & q & "]"
+                        End If
+                        r = r & indent & nodeVarName & " = " & controlVarName & ".insert(" & nodeParentVarName & ", tk.END, text=" & q & Convert2PythonFormatText(node.text) & q & ", open=" & node.Expanded & ")" & vbLf
+                    Next item
+                    If hasScrollProperty(ctrl) Then
+                        enableScrollBar = ctrl.Scroll
+                    Else
+                        enableScrollBar = True
+                    End If
+                    If enableScrollBar Then
+                        r = r & SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                        r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                    End If
+                End If
+                
                 ' Set each Caption and font in MultiPage, font size is rounded
                 If TypeName(ctrl) = "MultiPage" Then
                     styleName = tkStyleBaseName & ".TNotebook"
                     r = r & indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
                     
-                    Set tabFontStyles = New Collection
-                    tabFontStyleSetting = ""
-                    
-                    If ctrl.Font.Bold Then tabFontStyles.Add "bold"
-                    If ctrl.Font.Italic Then tabFontStyles.Add "italic"
-                    If ctrl.Font.Underline Then tabFontStyles.Add "underline"
-                    If ctrl.Font.Strikethrough Then tabFontStyles.Add "overstrike"
-                    
-                    tabFontStyleSetting = q & Join(Collection2Array(tabFontStyles), " ") & q
+                    ttkFontSetting = GenerateTtkFontSetting(ctrl)
                     
                     r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
                     
@@ -418,20 +433,20 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                    
                     Select Case ctrl.TabOrientation
                         Case fmTabOrientationTop
-                            TabOrientation = "nw"
+                            tabPosition = "nw"
                         Case fmTabOrientationBottom
-                            TabOrientation = "sw"
+                            tabPosition = "sw"
                         Case fmTabOrientationLeft
-                            TabOrientation = "wn"
+                            tabPosition = "wn"
                         Case fmTabOrientationRight
-                            TabOrientation = "en"
+                            tabPosition = "en"
                         Case Else
-                            TabOrientation = "n"
+                            tabPosition = "n"
                     End Select
                     
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", tabposition=" & q & TabOrientation & q & ")" & vbLf
+                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", tabposition=" & q & tabPosition & q & ")" & vbLf
                     
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & " + "".Tab""" & ", font=(" & Join(Array(q & ctrl.Font.Name & q, Round(ctrl.Font.Size), tabFontStyleSetting), ", ") & ")" & ")" & vbLf
+                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & " + "".Tab""" & ", " & ttkFontSetting & ")" & vbLf
                     r = r & indent & prefix & "style.configure(" & ttkStyleRef & " + "".Tab""" & ", foreground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
                     
                     
@@ -439,7 +454,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                         childVarName = GenerateCtrlVarName(item, prefix, useCls)
                         caption = item.caption
                         caption = Convert2PythonFormatText(caption)
-                        r = r & indent & childVarName & " = tk.Frame(" & controlVarName & ")" & vbLf
+                        r = r & indent & childVarName & " = tk.Frame(" & controlVarName & ", bg=" & q & FormColorToHex(&H8000000F) & q & ")" & vbLf
                         r = r & indent & controlVarName & ".add(" & childVarName & ", text=" & q & caption & q & ")" & vbLf
                     Next
                     
@@ -448,7 +463,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                 
                 
                 ' Font size is rounded because Tkinter does not support floats in font settings
-                If GetTkWidgetName(ctrl) = "LabelFrame" Or Not ContainsValue(Array("Frame", "ScrollBar", "Image", "SpinButton", "MultiPage"), TypeName(ctrl)) Then
+                If GetTkWidgetName(ctrl) = "tk.LabelFrame" Or ContainsValue(Array("Label", "CommandButton", "TextBox", "ListBox", "CheckBox", "ToggleButton", "OptionButton", "ComboBox"), TypeName(ctrl)) Then
                     fontStyle = ""
                     fontOpts = ""
                     
@@ -466,7 +481,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                     r = r & indent & controlVarName & GetBorderSetting(ctrl) & vbLf
                 End If
                 
-                If GetTkWidgetName(ctrl) <> "Text" And ContainsValue(Array("Label", "TextBox", "ComboBox", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
+                If GetTkWidgetName(ctrl) <> "tk.Text" And ContainsValue(Array("Label", "TextBox", "ComboBox", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
                     r = r & GetTextAlignSetting(ctrl, indent, prefix, useCls) & vbLf
                 End If
                 
@@ -477,6 +492,8 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                         r = r & indent & controlVarName & ".configure(cursor=" & q & cursorType & q & ")" & vbLf
                     End If
                 End If
+                
+                
                 
                 If TypeName(ctrl) = "Image" Then
                     Select Case ctrl.PictureAlignment
@@ -509,6 +526,21 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                     r = r & indent & "#" & controlVarName & "_photo = tk.PhotoImage(file=r" & q & q & ")" & vbLf
                     r = r & indent & "#" & controlVarName & ".create_image(" & canvasCoordX & ", " & canvasCoordY & ", image=" & controlVarName & "_photo" & ", anchor=" & q & canvasAnchor & q & ")" & vbLf
                 End If
+                
+                
+                If GetTkWidgetName(ctrl) = "tk.Text" Then
+                
+                    Select Case ctrl.ScrollBars
+                        Case fmScrollBarsHorizontal
+                            r = r & SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                        Case fmScrollBarsVertical
+                            r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                        Case fmScrollBarsBoth
+                            r = r & SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                            r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                    End Select
+                End If
+                
                 
                 r = r & vbLf
                 
@@ -543,6 +575,26 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
     GenerateTkinterCode = r
 End Function
 
+Private Function GetUserFormObjectFromCtrl(ByVal ctrl As Object) As Object
+    ' Get the ancestor (UserForm) of the control.
+    
+    Dim root As Object
+    
+    If ctrl Is Nothing Then
+        Err.Raise 13
+    End If
+    
+    Set root = ctrl
+    ' Loop to get root(UserForm) object
+    On Error GoTo Finally:
+    Do While True
+        Set root = root.Parent
+    Loop
+    On Error GoTo 0
+
+Finally:
+    Set GetUserFormObjectFromCtrl = root
+End Function
 
 Private Function GenerateCtrlVarName(ByVal ctrl As Object, ByVal prefix As String, ByVal useCls As Boolean) As String
     ' Generates a valid, unique identifier for a control in the target language.
@@ -680,47 +732,97 @@ Private Function GenerateTtkStyleDefinitionCode(ByVal tkVarName As String, ByVal
     GenerateTtkStyleDefinitionCode = code
 End Function
 
+Private Function GenerateTtkFontSetting(ByVal ctrl As Object) As String
+    ' Returns the font setting for a ttk widget, such as:
+    ' font=("Arial Narrow", 10, "")
+    Dim ttkFontSetting As String
+    Dim ttkFontStyleSetting As String
+    Dim ttkFontStyles As Collection
+    Const q As String = """"
+    Set ttkFontStyles = New Collection
+    ttkFontStyleSetting = ""
+    
+    If ctrl.Font.Bold Then ttkFontStyles.Add "bold"
+    If ctrl.Font.Italic Then ttkFontStyles.Add "italic"
+    If ctrl.Font.Underline Then ttkFontStyles.Add "underline"
+    If ctrl.Font.Strikethrough Then ttkFontStyles.Add "overstrike"
+    
+    ttkFontStyleSetting = q & Join(Collection2Array(ttkFontStyles), " ") & q
+    ttkFontSetting = "font=(" & Join(Array(q & ctrl.Font.Name & q, Round(ctrl.Font.Size), ttkFontStyleSetting), ", ") & ")"
+    GenerateTtkFontSetting = ttkFontSetting
+End Function
+
 Private Function GetTkWidgetName(ByVal ctrl As Object) As String
     Dim r As String
     Select Case TypeName(ctrl)
         Case "Label"
-            r = "Label"
+            r = "tk.Label"
         Case "CommandButton"
-            r = "Button"
+            r = "tk.Button"
         Case "Frame"
             If ctrl.caption = "" Then
-                r = "Frame"
+                r = "tk.Frame"
             Else
-                r = "LabelFrame"
+                r = "tk.LabelFrame"
             End If
         Case "TextBox"
             If ctrl.MultiLine Then
-                r = "Text"
+                r = "tk.Text"
             Else
-                r = "Entry"
+                r = "tk.Entry"
             End If
         Case "SpinButton"
-            r = "Spinbox"
+            r = "tk.Spinbox"
         Case "ListBox"
-            r = "Listbox"
+            r = "tk.Listbox"
         Case "CheckBox"
-            r = "Checkbutton"
+            r = "tk.Checkbutton"
         Case "ToggleButton"
-            r = "Checkbutton"
+            r = "tk.Checkbutton"
         Case "OptionButton"
-            r = "Radiobutton"
+            r = "tk.Radiobutton"
         Case "Image"
-            r = "Canvas"
+            r = "tk.Canvas"
         Case "ScrollBar"
-            r = "Scale"
+            r = "ttk.Scale"
         Case "ComboBox"
-            r = "Combobox"
+            r = "ttk.Combobox"
         Case "MultiPage"
-            r = "Notebook"
+            r = "ttk.Notebook"
         Case Else
             r = ""
+            
+            If IsListView(ctrl) Then
+                r = "ttk.Treeview"
+            End If
+            
+            If IsTreeView(ctrl) Then
+                r = "ttk.Treeview"
+            End If
+            
     End Select
     GetTkWidgetName = r
+End Function
+
+
+Private Function IsListView(ByVal ctrl As Object) As Boolean
+    ' Since the class name of the ListView may vary depending on the version, so use InStr to check it.
+    ' e.g ListView/ListView4
+    If InStr(TypeName(ctrl), "ListView") = 1 Then
+        IsListView = True
+    Else
+        IsListView = False
+    End If
+End Function
+
+Private Function IsTreeView(ByVal ctrl As Object) As Boolean
+    ' Since the class name of the TreeView may vary depending on the version, so use InStr to check it.
+    ' e.g TreeView/TreeView4
+    If InStr(TypeName(ctrl), "TreeView") = 1 Then
+        IsTreeView = True
+    Else
+        IsTreeView = False
+    End If
 End Function
 
 Private Function GetControlCursorType(ByVal ctrl As Object) As String
@@ -817,6 +919,78 @@ Private Function SetTkCheckbuttonValues(ByVal ctrls As Variant, ByVal indent As 
     SetTkCheckbuttonValues = r
 End Function
 
+Private Function SetVScrollBarToWidget(ByVal ctrl As Object, ByVal indent As String, ByVal prefix As String, ByVal useCls As Boolean, ByVal setToInside As Boolean) As String
+    ' This function generates and returns the Tkinter Python code required to attach a vertical scrollbar to a specific widget.
+    ' setToInside:
+    '   A boolean flag that determines the scrollbar's placement. If set to True, the scrollbar is placed within the widget's boundaries (overlay mode). If False, it is placed outside the widget's edge.
+    Dim r As String
+    Dim scrollBarVarName As String
+    Dim scrollBarCoordX As String
+    Dim scrollBarCoordY As String
+    Dim scrollBarCoordWidth As String
+    Dim scrollBarCoordHeight As String
+    Dim controlVarName As String
+    Dim parentVarName As String
+    controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
+    parentVarName = GenerateCtrlVarName(ctrl.Parent, prefix, useCls)
+    r = ""
+    scrollBarVarName = controlVarName & "_" & "vscrollbar"
+    scrollBarCoordX = "int(" & controlVarName & ".place_info()[""x""])" & "+" & "int(" & controlVarName & ".place_info()[""width""])"
+    scrollBarCoordY = "int(" & controlVarName & ".place_info()[""y""])"
+    scrollBarCoordWidth = "20"
+    scrollBarCoordHeight = "int(" & controlVarName & ".place_info()[""height""])"
+    
+    If setToInside Then
+        scrollBarCoordX = scrollBarCoordX & "-" & scrollBarCoordWidth
+        scrollBarCoordY = scrollBarCoordY & "+1"
+        scrollBarCoordWidth = scrollBarCoordWidth & "-1"
+        scrollBarCoordHeight = scrollBarCoordHeight & "-2"
+    End If
+    
+    r = r & indent & scrollBarVarName & " = tk.Scrollbar(" & parentVarName & ", orient=""vertical"")" & vbLf
+    r = r & indent & scrollBarVarName & ".place(x=" & scrollBarCoordX & ",y=" & scrollBarCoordY & ", width=" & scrollBarCoordWidth & ", height=" & scrollBarCoordHeight & ")" & vbLf
+    r = r & indent & controlVarName & ".configure(yscrollcommand=" & scrollBarVarName & ".set)" & vbLf
+    r = r & indent & scrollBarVarName & ".configure(command=" & controlVarName & ".yview)" & vbLf
+    
+    SetVScrollBarToWidget = r
+End Function
+
+Private Function SetHScrollBarToWidget(ByVal ctrl As Object, ByVal indent As String, ByVal prefix As String, ByVal useCls As Boolean, ByVal setToInside As Boolean) As String
+    ' This function generates and returns the Tkinter Python code required to attach a horizontal scrollbar to a specific widget
+    ' setToInside:
+    '   A boolean flag that determines the scrollbar's placement. If set to True, the scrollbar is placed within the widget's boundaries (overlay mode). If False, it is placed outside the widget's edge.
+    Dim r As String
+    Dim scrollBarVarName As String
+    Dim scrollBarCoordX As String
+    Dim scrollBarCoordY As String
+    Dim scrollBarCoordWidth As String
+    Dim scrollBarCoordHeight As String
+    Dim controlVarName As String
+    Dim parentVarName As String
+    controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
+    parentVarName = GenerateCtrlVarName(ctrl.Parent, prefix, useCls)
+    r = ""
+    scrollBarVarName = controlVarName & "_" & "hscrollbar"
+    scrollBarCoordX = "int(" & controlVarName & ".place_info()[""x""])"
+    scrollBarCoordY = "int(" & controlVarName & ".place_info()[""y""])" & "+" & "int(" & controlVarName & ".place_info()[""height""])"
+    scrollBarCoordWidth = "int(" & controlVarName & ".place_info()[""width""])"
+    scrollBarCoordHeight = "20"
+    
+    If setToInside Then
+        scrollBarCoordX = scrollBarCoordX & "+1"
+        scrollBarCoordY = scrollBarCoordY & "-" & scrollBarCoordHeight
+        scrollBarCoordWidth = scrollBarCoordWidth & "-2"
+        scrollBarCoordHeight = scrollBarCoordHeight & "-1"
+    End If
+    
+    r = r & indent & scrollBarVarName & " = tk.Scrollbar(" & parentVarName & ", orient=""horizontal"")" & vbLf
+    r = r & indent & scrollBarVarName & ".place(x=" & scrollBarCoordX & ",y=" & scrollBarCoordY & ", width=" & scrollBarCoordWidth & ", height=" & scrollBarCoordHeight & ")" & vbLf
+    r = r & indent & controlVarName & ".configure(xscrollcommand=" & scrollBarVarName & ".set)" & vbLf
+    r = r & indent & scrollBarVarName & ".configure(command=" & controlVarName & ".xview)" & vbLf
+    
+    SetHScrollBarToWidget = r
+End Function
+
 Private Function GetListBoxValue(ByVal ctrl As Object, ByVal indent As String) As String
     ' Retrieve the items of a ListBox or ComboBox as a string in the format ["1", "2", "3"].
     Const q As String = """"
@@ -848,6 +1022,274 @@ Private Function GetListBoxValue(ByVal ctrl As Object, ByVal indent As String) A
     End If
     
     GetListBoxValue = r
+End Function
+
+Private Function DefineListViewColumns(ByVal ctrl As Object, ByVal indent As String, ByVal prefix As String, ByVal useCls As Boolean) As String
+    ' Generate code for the ListView headers.
+    ' Example:
+    ' ListView1.heading("col1", text="Header1", anchor="w")
+    ' ListView1.heading("col2", text="Header2", anchor="w")
+    ' ListView1.heading("col3", text="Header3", anchor="w")
+    ' ListView1.column("col1", width=133, anchor="w")
+    ' ListView1.column("col2", width=133, anchor="w")
+    ' ListView1.column("col3", width=133, anchor="w")
+    Dim objHeaders As Object
+    Set objHeaders = ctrl.ColumnHeaders
+    Dim controlVarName As String
+    Dim i As Long
+    Dim item As Variant
+    Dim r As String
+    Dim colName As String
+    Dim headerText As String
+    Dim colWidth As Long
+    Dim anchor As String
+    Const q As String = """"
+    controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
+    r = ""
+    i = 0
+    For Each item In objHeaders
+        i = i + 1
+        colName = "col" & i
+        headerText = Convert2PythonFormatText(item.text)
+        anchor = GetTtkTreeviewAnchor(item)
+        r = r & indent & controlVarName & ".heading(" & q & colName & q & ", text=" & q & headerText & q & ", anchor=" & q & anchor & q & ")" & vbLf
+    Next item
+    
+    i = 0
+    For Each item In objHeaders
+        i = i + 1
+        colName = "col" & i
+        anchor = GetTtkTreeviewAnchor(item)
+        colWidth = UserFormSizeToPixel(item.Width)
+        r = r & indent & controlVarName & ".column(" & q & colName & q & ", width=" & colWidth & ", anchor=" & q & anchor & q & ", stretch=False)" & vbLf
+    Next item
+    
+    DefineListViewColumns = r
+End Function
+
+Private Function GetTtkTreeviewAnchor(ByVal objLvHeader As Object) As String
+    ' Header Alignment(ListView) -> anchor(ttk.Treeview)
+    Const cnsLvwColumnLeft As Long = 0
+    Const cnsLvwColumnRight As Long = 1
+    Const cnsLvwColumnCenter As Long = 2
+    Dim result As String
+    Select Case objLvHeader.Alignment
+        Case cnsLvwColumnLeft
+            result = "w"
+        Case cnsLvwColumnRight
+            result = "e"
+        Case cnsLvwColumnCenter
+            result = "center"
+        Case Else
+            result = "w"
+    End Select
+    GetTtkTreeviewAnchor = result
+End Function
+
+Private Function GenerateListViewHeaders(ByVal ctrl As Object) As String
+    ' Generate the header names of a ListView as a string in the format ["col1", "col2", "col3"]
+    Dim objHeaders As Object
+    Set objHeaders = ctrl.ColumnHeaders
+    Dim i As Long
+    Dim item As Variant
+    Dim colName As String
+    Dim r As String
+    Const q As String = """"
+    Dim coll As New Collection
+    Dim arr() As Variant
+    r = ""
+    For Each item In objHeaders
+        i = i + 1
+        colName = "col" & i
+        coll.Add q & colName & q
+    Next item
+    arr = Collection2Array(coll)
+    r = r & "[" & Join(arr, ", ") & "]"
+    GenerateListViewHeaders = r
+End Function
+
+Private Function GetListViewItems(ByVal ctrl As Object, ByVal indent As String) As String
+    ' Retrieve the items of a ListView as a string in the format:
+    ' [
+    '     ["Item1-1", "Item1-2", "Item1-3"],
+    '     ["Item2-1", "Item2-2", "Item2-3"],
+    '     ["Item3-1", "Item3-2", "Item3-3"]
+    ' ]
+    Dim item As Object
+    Dim i As Long
+    Dim coll As Collection
+    Dim resultColl As New Collection
+    Dim arr() As Variant
+    Dim r As String
+    Const arrayLiteralStart As String = "["
+    Const arrayLiteralEnd As String = "]"
+    Const q As String = """"
+    r = ""
+    For Each item In ctrl.ListItems
+        Set coll = New Collection
+        coll.Add q & Convert2PythonFormatText(item.text) & q
+        
+        ' Because older versions of the ListView control do not support For Each for SubItems, use index-based access.
+        For i = 1 To ctrl.ColumnHeaders.Count - 1
+            coll.Add q & Convert2PythonFormatText(item.SubItems(i)) & q
+        Next
+        
+        arr = Collection2Array(coll)
+        resultColl.Add arrayLiteralStart & Join(arr, ", ") & arrayLiteralEnd
+        
+    Next
+    
+    arr = Collection2Array(resultColl)
+    If resultColl.Count > 0 Then
+        r = r & arrayLiteralStart & vbLf & indent & "    " & Join(arr, ", " & vbLf & indent & "    ") & vbLf & indent & arrayLiteralEnd
+    Else
+        r = r & arrayLiteralStart & arrayLiteralEnd
+    End If
+    GetListViewItems = r
+End Function
+
+Private Function GetTextSizeFromCtrlFontSetting(ByVal ctrl As Object, ByVal targetText As String) As Variant()
+    '------------------------------------------------------------------------------
+    ' Returns the rendered text size (Width, Height) for a given text string
+    ' using the same font settings as the specified control.
+    ' Size is measured in points, not pixels.
+    '
+    ' Parameters:
+    '   ctrl        - The reference control whose font settings will be used.
+    '   targetText  - The text to measure. If empty, "i" is used to ensure a measurable size is returned.
+    '                 (The letter gih is one of the ASCII characters with the narrowest rendering width.)
+    '
+    ' Returns:
+    '   Variant() Array
+    '       (0) = Text width
+    '       (1) = Text height
+    '
+    ' Notes:
+    '   - A temporary hidden Label control is dynamically created on the parent
+    '     UserForm to calculate the actual rendered text dimensions.
+    '   - AutoSize is enabled so the Label automatically resizes to fit the text.
+    '   - The temporary control is removed immediately after measurement.
+    '
+    ' Compatibility Note:
+    '   In Excel 2013 and earlier, it was confirmed that enabling .AutoSize does not
+    '   correctly update the .Width and .Height properties, which remain 0.
+    '   To avoid returning invalid measurements, this function falls back to
+    '   an estimated size calculation based on the font size and text length.
+    '   This fallback is less accurate than actual rendered text measurement.
+    '
+    '------------------------------------------------------------------------------
+    Dim rootForm As Object
+    Dim tempLabel As Object
+    Dim tempName As String
+    Dim textWidthSize As Double
+    Dim textHeightSize As Double
+    ' Prevent zero-size measurement for empty strings.
+    If targetText = "" Then targetText = "i"
+    ' Generate a unique temporary control name.
+    tempName = "TempLabel_" & VBA.Replace(GenerateUUIDv4(), "-", "_")
+    ' Get the parent UserForm from the specified control.
+    Set rootForm = GetUserFormObjectFromCtrl(ctrl)
+    ' Create a temporary Label control for text measurement.
+    Set tempLabel = rootForm.Controls.Add("Forms.Label.1", tempName, True)
+    ' Initialize control properties.
+    tempLabel.Height = 0
+    tempLabel.Width = 0
+    tempLabel.caption = ""
+    tempLabel.AutoSize = True
+    tempLabel.WordWrap = False
+    ' Optional debug background color.
+    tempLabel.BackColor = &H80C0FF
+    ' Copy font settings from the source control.
+    tempLabel.Font.Name = ctrl.Font.Name
+    tempLabel.Font.Size = ctrl.Font.Size
+    tempLabel.Font.Bold = ctrl.Font.Bold
+    tempLabel.Font.Italic = ctrl.Font.Italic
+    tempLabel.Font.Underline = ctrl.Font.Underline
+    tempLabel.Font.Strikethrough = ctrl.Font.Strikethrough
+    ' Apply target text so AutoSize calculates the rendered dimensions.
+    tempLabel.caption = targetText
+    ' Read calculated size.
+    textWidthSize = tempLabel.Width
+    textHeightSize = tempLabel.Height
+    
+    ' In Excel 2013 and earlier, it was confirmed that the result of .AutoSize
+    ' is not reflected in .Width/.Height and remains 0.
+    ' As a fallback, the font size is used instead,
+    ' although the measurement accuracy is reduced.
+    If textWidthSize = 0 Then textWidthSize = ctrl.Font.Size * Len(targetText)
+    If textHeightSize = 0 Then textHeightSize = ctrl.Font.Size
+    
+    ' The .Controls.Remove method does not accept a String argument; the argument must be of type Variant (String).
+    ' example: tempLabel.Name or CVar(tempName)
+    Call rootForm.Controls.Remove(tempLabel.Name)
+    ' Release object reference.
+    Set tempLabel = Nothing
+    ' Return width and height as an array.
+    GetTextSizeFromCtrlFontSetting = VBA.Array(textWidthSize, textHeightSize)
+End Function
+
+Private Function GetAllTreeViewNodesBfs(ByVal treeviewCtrl As Object) As Collection
+    ' This function performs a Breadth-First Search (BFS) on a TreeView control
+    ' and returns a collection of nodes along with their hierarchy path.
+    ' example:
+    ' [[node, "1"], [node, "1-1"], [node, "1-2"], [node, "1-3"], [node, "1-4"], [node, "1-5"], [node, "1-6"], [node, "1-1-1"]]
+    Dim queue As Collection
+    Dim item As Variant
+    Dim node As Object
+    Dim child As Object
+    Dim hierarchy As String
+    Dim childIndex As Long
+    Dim resultColl As Collection
+    Set resultColl = New Collection
+    Set queue = New Collection
+    
+    Dim nd As Object
+    Dim rootIndex As Long
+    rootIndex = 1
+    
+    ' Step 1: Add all root nodes (nodes without parents) to the queue
+    ' Each root gets a hierarchy label like "1", "2", etc.
+    For Each nd In treeviewCtrl.nodes
+        If nd.Parent Is Nothing Then
+            queue.Add VBA.Array(nd, CStr(rootIndex))
+            rootIndex = rootIndex + 1
+        End If
+    Next nd
+    
+    ' Step 2: Perform BFS traversal
+    Do While queue.Count > 0
+        item = queue(1)
+        queue.Remove 1
+        
+        Set node = item(0)
+        hierarchy = item(1)
+        ' Add current node and its hierarchy to the result collection
+        resultColl.Add VBA.Array(node, hierarchy)
+        ' Step 3: Enqueue all children of the current node
+        Set child = node.child ' Get first child
+        childIndex = 1
+        
+        Do While Not child Is Nothing
+            ' Append child index to hierarchy (e.g., "1-2", "1-2-1")
+            queue.Add VBA.Array(child, hierarchy & "-" & childIndex)
+            childIndex = childIndex + 1
+            Set child = child.Next
+        Loop
+    Loop
+    ' Return the collection of (node, hierarchy) pairs
+    Set GetAllTreeViewNodesBfs = resultColl
+End Function
+
+Private Function hasScrollProperty(ByVal ctrl As Object) As Boolean
+    ' Since the Scroll property does not exist in older versions of TreeView, use this function to check for the property beforehand.
+    Dim temp As Variant
+    On Error GoTo Exception
+    temp = VBA.Array(ctrl.Scroll)
+    hasScrollProperty = True
+    On Error GoTo 0
+    Exit Function
+Exception:
+    hasScrollProperty = False
 End Function
 
 Private Function Convert2PythonFormatText(ByVal text As String) As String
@@ -966,78 +1408,16 @@ Private Function IsStrictlyEqual(ByVal value1 As Variant, ByVal value2 As Varian
     IsStrictlyEqual = False
 End Function
 
-Private Function Win32_FindWindowW(ByVal className As String, ByVal windowTitle As String) As LongPtr
-    ' Get the window's hwnd
-    ' className: The window's class name (exact match). If not specified, provide "", Empty, or vbNullString
-    ' windowTitle: The window's title (exact match). If not specified, provide "", Empty, or vbNullString
-    ' Example: Get Excel's main window by specifying only the class name
-    ' hwnd = Win32_FindWindowW("XLMAIN", Empty)
-    Dim hwnd As LongPtr
-    If className = "" Then className = vbNullString
-    If windowTitle = "" Then windowTitle = vbNullString
-    hwnd = FindWindowW(StrPtr(className), StrPtr(windowTitle))
-    Win32_FindWindowW = hwnd
-End Function
-
-Private Function GetUserFormScaleFactorsAndOffsets(ByVal frm As Object) As Variant()
-    ' Function to get the factors and offsets for converting a UserForm's size to pixel units
-    ' Obtains the window size in pixels via Windows API and compares it with the UserForm's design size
-    Dim clRect As RECT
-    Dim winRect As RECT
-    Dim pixClWidth As Long, pixClHeight As Long
-    Dim pixWinWidth As Long, pixWinHeight As Long
-    Dim pixWidthOffset As Long, pixHeightOffset As Long
-    Dim scaleX As Double, scaleY As Double
-    Dim hwnd As LongPtr
-    Dim originalFrmTitle As String
-    Dim tempFrmTitle As String
-    Dim results(0 To 3) As Variant
-    
-    ' To avoid getting the handle of a window with the same name, temporarily change the title to a unique name when obtaining hwnd
-    ' Restore the original title immediately after obtaining hwnd
-    originalFrmTitle = frm.caption
-    tempFrmTitle = "TempName_" & GenerateUUIDv4()
-    frm.caption = tempFrmTitle
-    hwnd = Win32_FindWindowW("", tempFrmTitle)
-    frm.caption = originalFrmTitle
-    
-    If hwnd = 0 Then
-        Err.Raise Number:=513, Description:="Failed to get HWND."
-    End If
-    
-    ' Get the actual client area size
-    GetClientRect hwnd, clRect
-    pixClWidth = clRect.Right - clRect.Left
-    pixClHeight = clRect.Bottom - clRect.Top
-    
-    ' Get the difference in X and Y between the actual window size and the client area size
-    GetWindowRect hwnd, winRect
-    pixWinWidth = winRect.Right - winRect.Left
-    pixWinHeight = winRect.Bottom - winRect.Top
-    pixWidthOffset = pixWinWidth - pixClWidth
-    pixHeightOffset = pixWinHeight - pixClHeight
-    
-    ' Twips -> pixel conversion factors
-    scaleX = pixClWidth / frm.InsideWidth
-    scaleY = pixClHeight / frm.InsideHeight
-    
-    ' If horizontal and vertical scales are almost the same, return the average
-    If Abs(scaleX - scaleY) < 0.01 Then
-        results(0) = (scaleX + scaleY) / 2
-        results(1) = (scaleX + scaleY) / 2
-    Else
-        ' If there is a difference between horizontal and vertical scales
-        results(0) = scaleX
-        results(1) = scaleY
-    End If
-    results(2) = pixWidthOffset
-    results(3) = pixHeightOffset
-    GetUserFormScaleFactorsAndOffsets = results
-End Function
-
-Private Function UserFormSizeToPixel(ByVal ufSize As Double, ByVal factor As Double) As Long
+Private Function UserFormSizeToPixel(ByVal ufSize As Double) As Long
     ' Function to convert the size of a UserForm or control to pixels
-    UserFormSizeToPixel = Round(ufSize * factor)
+    ' Excel VBA UserForm dimensions are internally handled as
+    ' DPI-independent logical points based on a fixed 96 DPI system.
+    ' Therefore, point-to-pixel conversion can be calculated as:
+    '     pixel = point * (96 / 72)
+    ' and works consistently regardless of the monitor DPI setting.
+    Dim pixelSize As Long
+    pixelSize = Round(ufSize * (96 / 72))
+    UserFormSizeToPixel = pixelSize
 End Function
 
 Private Function GenerateUUIDv4() As String
@@ -1112,29 +1492,6 @@ Private Sub SaveUTF8Text_NoBOM(ByVal filePath As String, ByVal textData As Strin
     Set stream = Nothing
 End Sub
 
-Private Function GetPrimaryMonitorDPI() As Variant()
-    Dim hdc As LongPtr
-    Dim dpiX As Long, dpiY As Long
-    Dim results(0 To 1) As Variant
-    Const LOGPIXELSX As Long = 88 ' Horizontal DPI
-    Const LOGPIXELSY As Long = 90 ' Vertical DPI
-    
-    ' Get device context for the entire screen
-    hdc = GetDC(0)
-    
-    ' Get horizontal and vertical DPI
-    dpiX = GetDeviceCaps(hdc, LOGPIXELSX)
-    dpiY = GetDeviceCaps(hdc, LOGPIXELSY)
-    
-    ' Release the device context
-    ReleaseDC 0, hdc
-    
-    results(0) = dpiX
-    results(1) = dpiY
-    
-    ' Return DPI
-    GetPrimaryMonitorDPI = results
-End Function
 
 Private Function GenerateUnsupportedControlMessage(ByVal ctrl As Object) As String
     Const q As String = """"

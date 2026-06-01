@@ -3,14 +3,16 @@
 このプログラムは、Excel VBAにて作成したユーザーフォームをPythonのTkinter用に変換可能なプログラムです<br>
 
 ## 変換例
-<img width="681" height="1275" alt="Image" src="https://github.com/user-attachments/assets/9bd8ae88-4f31-411d-8acf-e83fc5c235b6" /><br>
+<img width="681" height="1275" alt="Image" src="https://github.com/user-attachments/assets/e4d37e92-4418-4f69-842e-25275bf596d6" /><br>
 <img width="704" height="695" alt="Image" src="https://github.com/user-attachments/assets/45678575-a162-4e18-a516-ba522727d1f9" /><br><br>
 
 ## 動作要件
 - 対応OS: Windows
-- 必要ソフトウェア: Microsoft Excel 2010以降
+- 必要ソフトウェア: Microsoft Excel 2000以降
+- 推奨環境: Microsoft Excel 2016以降
 
 ## 動作確認済環境
+- Windows XP(SP3) 
 - Windows 10/11
 - Excel 2010(32bit)
 - Excel 2016(32bit)
@@ -25,17 +27,21 @@
 - フォント(フォント種類、サイズ、太字、斜体)
 - 枠線(`UserForm`, `Frame`, `TextBox`, `Label`, `ListBox`, `Image`)
 - マウスカーソル
-- テキスト表示の左寄せ・中央・右寄せ(`Label`, `TextBox` [.MultiLine=False], `ComboBox`, `CheckBox`, `ToggleButton`, `OptionButton`)
+- テキスト表示の左寄せ・中央・右寄せ(`Label`, `TextBox` [.MultiLine=False], `ComboBox`, `CheckBox`, `ToggleButton`, `OptionButton`, `ListView`)
 - `TextBox`, `ComboBox`のデフォルト値
-- `ComboBox`, `ListBox`に設定したアイテム
+- `ComboBox`, `ListBox`, `ListView`, `TreeView`に設定したアイテム
 - `OptionButton`, `CheckBox`, `ToggleButton`の選択状態
 - `BackStyle`に設定した透明表示設定 (`Label`, `TextBox`, `CommandButton`, `CheckBox`, `ToggleButton`, `OptionButton`, `Image`, `ComboBox`)
 - `.TabOrientation`プロパティ (`MultiPage`)
 - `.Locked`プロパティ (`TextBox`, `ListBox`, `ComboBox`)
 - `.PasswordChar`プロパティ (`TextBox` [.MultiLine=False])
+- `.ScrollBars` プロパティ (`TextBox` [.MultiLine=True])
+- `.WordWrap` プロパティ (`TextBox` [.MultiLine=True])
 - `.Style`プロパティ (`ComboBox`, `MultiPage`)
 - `.MultiSelect`プロパティ (`ListBox`)
 - `.PictureAlignment`プロパティ (`Image`)
+- `.Scroll` プロパティ (`TreeView`)
+- `.Expanded` プロパティ (`TreeView.Nodes`)
 
 ※ `.BackStyle = fmBackStyleTransparent`の場合、Tkinterではウィジェットの背景色の透過がサポートされていないため以下のように変換されます
 
@@ -60,6 +66,8 @@
 | `ScrollBar` | `ttk.Scale` |
 | `ComboBox` | `ttk.Combobox` |
 | `MultiPage` | `ttk.Notebook` |
+| `ListView`(`.View=lvwReport`) | `ttk.Treeview`(`show="headings"`) |
+| `TreeView` | `ttk.Treeview`(`show="tree"`) |
 
 ※`SpinButton`は仕様が異なるため、配置方法によっては外観が異なります<br>
 ※`ScrollBar`についてはVBAのフォームには上下調整用のボタンがありますがTkinterの`Scale`にはありません<br>
@@ -113,9 +121,6 @@ Tkinterでは例として`Label`に`Label`を重ねた場合は設置した順�
 その場合は、Pythonのコードを編集し、前面に表示したいものを後に設置するか、VBA側でコントロールを配置し直すことで順番を後にしてください<br>
 なお、新規でGUIを作成する場合は重ねるよりも`Frame`などの明確な親子関係を設定可能なコントロールを使用することを推奨します<br>
 
-## 使用のさいの注意点
-マルチモニター環境でこのプログラムを使用する場合、一時的にモニターを1つにするか、すべてのモニターの拡大率を統一したうえで使用してください<br>
-異なる拡大率のモニターが混在している場合、ウィンドウサイズの計算が正常に行えない可能性があります<br>
 
 ## 日本語コメントのソースコードについて
 ソースコードのコメントは全文英語で記載していますが[ここ](https://gist.github.com/ZeeZeX/1f0bb62d9e476b0df2aed8653ca303d4)から日本語版を確認可能です、フォークするさいに必要であれば役に立ててください
