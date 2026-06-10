@@ -684,7 +684,7 @@ Private Function GetTextAlignSetting(ByVal ctrl As Object, ByVal indent As Strin
     Dim controlVarName As String
     controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
     r = ""
-    If TypeName(ctrl) = "CheckBox" Or TypeName(ctrl) = "OptionButton" Then
+    If ContainsValue(Array("CheckBox", "OptionButton", "ToggleButton"), TypeName(ctrl)) Then
         Select Case ctrl.TextAlign
             Case fmTextAlignLeft
                 anchor = "w"
