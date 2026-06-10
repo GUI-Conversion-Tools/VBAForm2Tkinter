@@ -39,7 +39,7 @@ This program converts userforms created in Microsoft Excel VBA into Python Tkint
 - `.ScrollBars` property (`TextBox` [.MultiLine=True])
 - `.WordWrap` property (`TextBox` [.MultiLine=True])
 - `.Style` property (`ComboBox`, `MultiPage`)
-- `.MultiSelect` property (`ListBox`)
+- `.MultiSelect` property (`ListBox`, `ListView`)
 - `.PictureAlignment` property (`Image`)
 - `.Scroll` property (`TreeView`)
 - `.Expanded` property (`TreeView.Nodes`)

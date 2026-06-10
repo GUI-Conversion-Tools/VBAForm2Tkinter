@@ -38,7 +38,7 @@
 - `.ScrollBars` プロパティ (`TextBox` [.MultiLine=True])
 - `.WordWrap` プロパティ (`TextBox` [.MultiLine=True])
 - `.Style`プロパティ (`ComboBox`, `MultiPage`)
-- `.MultiSelect`プロパティ (`ListBox`)
+- `.MultiSelect`プロパティ (`ListBox`, `ListView`)
 - `.PictureAlignment`プロパティ (`Image`)
 - `.Scroll` プロパティ (`TreeView`)
 - `.Expanded` プロパティ (`TreeView.Nodes`)

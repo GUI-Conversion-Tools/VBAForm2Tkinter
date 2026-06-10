@@ -1,6 +1,6 @@
 Attribute VB_Name = "VBAForm2Tkinter"
 
-' VBAForm2Tkinter v1.4.0
+' VBAForm2Tkinter v1.4.1
 ' https://github.com/GUI-Conversion-Tools/VBAForm2Tkinter
 ' Copyright (c) 2025-2026 ZeeZeX
 ' This software is released under the MIT License.
@@ -276,6 +276,16 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                             r = r & indent & controlVarName & ".configure(wrap=" & q & "none" & q & ")" & vbLf
                         End If
                         
+                        Select Case ctrl.ScrollBars
+                            Case fmScrollBarsHorizontal
+                                r = r & SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                            Case fmScrollBarsVertical
+                                r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                            Case fmScrollBarsBoth
+                                r = r & SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                                r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                        End Select
+                        
                     End If
                 End If
                 
@@ -369,6 +379,11 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                     r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", foreground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
                     r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
                     r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", fieldbackground=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
+                    If ctrl.MultiSelect Then
+                        r = r & indent & controlVarName & ".configure(selectmode=" & q & "extended" & q & ")" & vbLf
+                    Else
+                        r = r & indent & controlVarName & ".configure(selectmode=" & q & "browse" & q & ")" & vbLf
+                    End If
                     r = r & indent & listviewHeaderNames & " = " & GenerateListViewHeaders(ctrl) & vbLf
                     r = r & indent & controlVarName & ".configure(columns=" & listviewHeaderNames & ",show=" & q & "headings" & q & ")" & vbLf
                     r = r & DefineListViewColumns(ctrl, indent, prefix, useCls) & vbLf
@@ -388,6 +403,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                     r = r & indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
                     r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", " & ttkFontSetting & ")" & vbLf
                     r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", rowheight=" & rowPixelHeight & ")" & vbLf
+                    r = r & indent & controlVarName & ".configure(selectmode=" & q & "browse" & q & ")" & vbLf
                     Set treeviewNodes = GetAllTreeViewNodesBfs(ctrl)
                     r = r & indent & controlVarName & ".configure(show=" & q & "tree" & q & ")" & vbLf
                     r = r & indent & nodeDictName & " = {}" & vbLf
@@ -401,7 +417,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                         End If
                         r = r & indent & nodeVarName & " = " & controlVarName & ".insert(" & nodeParentVarName & ", tk.END, text=" & q & Convert2PythonFormatText(node.text) & q & ", open=" & node.Expanded & ")" & vbLf
                     Next item
-                    If hasScrollProperty(ctrl) Then
+                    If HasScrollProperty(ctrl) Then
                         enableScrollBar = ctrl.Scroll
                     Else
                         enableScrollBar = True
@@ -525,20 +541,6 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                     
                     r = r & indent & "#" & controlVarName & "_photo = tk.PhotoImage(file=r" & q & q & ")" & vbLf
                     r = r & indent & "#" & controlVarName & ".create_image(" & canvasCoordX & ", " & canvasCoordY & ", image=" & controlVarName & "_photo" & ", anchor=" & q & canvasAnchor & q & ")" & vbLf
-                End If
-                
-                
-                If GetTkWidgetName(ctrl) = "tk.Text" Then
-                
-                    Select Case ctrl.ScrollBars
-                        Case fmScrollBarsHorizontal
-                            r = r & SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
-                        Case fmScrollBarsVertical
-                            r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
-                        Case fmScrollBarsBoth
-                            r = r & SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
-                            r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
-                    End Select
                 End If
                 
                 
@@ -675,28 +677,44 @@ End Function
 
 
 Private Function GetTextAlignSetting(ByVal ctrl As Object, ByVal indent As String, ByVal prefix As String, ByVal useCls As Boolean) As String
-   Dim r As String
-   Const q As String = """"
-   Dim anchor As String
-   Dim justify As String
-   Dim controlVarName As String
-   controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
-   r = ""
-   
-   Select Case ctrl.TextAlign
-        Case fmTextAlignLeft
-            anchor = "nw"
-            justify = "left"
-        Case fmTextAlignCenter
-            anchor = "n"
-            justify = "center"
-        Case fmTextAlignRight
-            anchor = "ne"
-            justify = "right"
-        Case Else
-            anchor = "n"
-            justify = "center"
-    End Select
+    Dim r As String
+    Const q As String = """"
+    Dim anchor As String
+    Dim justify As String
+    Dim controlVarName As String
+    controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
+    r = ""
+    If TypeName(ctrl) = "CheckBox" Or TypeName(ctrl) = "OptionButton" Then
+        Select Case ctrl.TextAlign
+            Case fmTextAlignLeft
+                anchor = "w"
+                justify = "left"
+            Case fmTextAlignCenter
+                anchor = "center"
+                justify = "center"
+            Case fmTextAlignRight
+                anchor = "e"
+                justify = "right"
+            Case Else
+                anchor = "center"
+                justify = "center"
+        End Select
+    Else
+        Select Case ctrl.TextAlign
+            Case fmTextAlignLeft
+                anchor = "nw"
+                justify = "left"
+            Case fmTextAlignCenter
+                anchor = "n"
+                justify = "center"
+            Case fmTextAlignRight
+                anchor = "ne"
+                justify = "right"
+            Case Else
+                anchor = "n"
+                justify = "center"
+        End Select
+    End If
     If Not ContainsValue(Array("TextBox", "ComboBox"), TypeName(ctrl)) Then
         r = indent & controlVarName & ".configure(anchor=" & q & anchor & q & ")" & vbLf
     End If
@@ -807,7 +825,7 @@ End Function
 
 Private Function IsListView(ByVal ctrl As Object) As Boolean
     ' Since the class name of the ListView may vary depending on the version, so use InStr to check it.
-    ' e.g ListView/ListView4
+    ' e.g ListView/ListView2/ListView3/ListView4
     If InStr(TypeName(ctrl), "ListView") = 1 Then
         IsListView = True
     Else
@@ -817,7 +835,7 @@ End Function
 
 Private Function IsTreeView(ByVal ctrl As Object) As Boolean
     ' Since the class name of the TreeView may vary depending on the version, so use InStr to check it.
-    ' e.g TreeView/TreeView4
+    ' e.g TreeView/TreeView2/TreeView3/TreeView4
     If InStr(TypeName(ctrl), "TreeView") = 1 Then
         IsTreeView = True
     Else
@@ -1157,7 +1175,7 @@ Private Function GetTextSizeFromCtrlFontSetting(ByVal ctrl As Object, ByVal targ
     ' Parameters:
     '   ctrl        - The reference control whose font settings will be used.
     '   targetText  - The text to measure. If empty, "i" is used to ensure a measurable size is returned.
-    '                 (The letter gih is one of the ASCII characters with the narrowest rendering width.)
+    '                 (The letter ÂgiÂh is one of the ASCII characters with the narrowest rendering width.)
     '
     ' Returns:
     '   Variant() Array
@@ -1280,16 +1298,16 @@ Private Function GetAllTreeViewNodesBfs(ByVal treeviewCtrl As Object) As Collect
     Set GetAllTreeViewNodesBfs = resultColl
 End Function
 
-Private Function hasScrollProperty(ByVal ctrl As Object) As Boolean
+Private Function HasScrollProperty(ByVal ctrl As Object) As Boolean
     ' Since the Scroll property does not exist in older versions of TreeView, use this function to check for the property beforehand.
     Dim temp As Variant
     On Error GoTo Exception
     temp = VBA.Array(ctrl.Scroll)
-    hasScrollProperty = True
+    HasScrollProperty = True
     On Error GoTo 0
     Exit Function
 Exception:
-    hasScrollProperty = False
+    HasScrollProperty = False
 End Function
 
 Private Function Convert2PythonFormatText(ByVal text As String) As String
@@ -1306,6 +1324,12 @@ Private Function Convert2PythonFormatText(ByVal text As String) As String
 End Function
 
 Private Function FormColorToHex(ByVal clr As Long) As String
+    ' Example:
+    ' 16777215 -> "#FFFFFF"
+    ' 0 -> "#000000"
+    ' &H000000FF& (255) -> "#FF0000"
+    ' &H00B4769E& (11826846) -> "#9E76B4"
+    ' &H8000000F& (-2147483633) -> "#F0F0F0"(Windows XP[Luna Theme]/10/11), "#D4D0C8"(Windows 2000/XP[Classic Theme])
     Dim r As Long, g As Long, b As Long
     ' Convert a system color to its decimal color code when the parameter is a system color
     If 0 > clr Or clr >= 2147483648# Then
