@@ -47,10 +47,12 @@
 - `.Scroll` プロパティ (`TreeView`)
 - `.Expanded` プロパティ (`TreeView.Nodes`)
 
-※ `.BackStyle = fmBackStyleTransparent`の場合、Tkinterではウィジェットの背景色の透過がサポートされていないため以下のように変換されます
-
--   親コントロールが`.BackColor`プロパティを持つ場合、その色を`.BackColor`に設定します
--   親コントロールが`Page`の場合、`.BackColor`プロパティを持たないため`Page`の視覚的な背景色と一致するシステムカラーの`&H8000000F&`を`.BackColor`に設定します
+> Note:  
+> - `.BackStyle = fmBackStyleTransparent`の場合、Tkinterではウィジェットの背景色の透過がサポートされていないため以下のように変換されます
+>   -   親コントロールが`.BackColor`プロパティを持つ場合、その色を`.BackColor`に設定します
+>   -   親コントロールが`Page`の場合、`.BackColor`プロパティを持たないため`Page`の視覚的な背景色と一致するシステムカラーの`&H8000000F&`を`.BackColor`に設定します
+> 
+> - Tkinter は、画像のリサイズ表示をネイティブでサポートしていないため、`.PictureSizeMode` プロパティを `fmPictureSizeModeStretch` または `fmPictureSizeModeZoom` に設定して画像をエクスポートする場合、埋め込まれた画像はコントロールのサイズに合わせてリサイズされた状態でエクスポートされます<br>これにより、元のVBAのUserForm の外観を可能な限り忠実に再現しています
 
 ## 対応しているコントロールの種類
 | VBA Formのクラス | Tkinterのクラス|
@@ -73,9 +75,10 @@
 | `ListView`(`.View=lvwReport`) | `ttk.Treeview`(`show="headings"`) |
 | `TreeView` | `ttk.Treeview`(`show="tree"`) |
 
-※`SpinButton`は仕様が異なるため、配置方法によっては外観が異なります<br>
-※`ScrollBar`についてはVBAのフォームには上下調整用のボタンがありますがTkinterの`Scale`にはありません<br>
-<br>
+> Note:
+>- `SpinButton`は仕様が異なるため、配置方法によっては外観が異なります
+>- `ScrollBar`についてはVBAのフォームには上下調整用のボタンがありますがTkinterの`Scale`にはありません
+
 上記以外のコントロールがフォーム上にある場合、変換に失敗するので該当のコントロールを削除したうえで再度変換を行ってください<br>
 
 ## 使い方
@@ -136,7 +139,7 @@ C:\Users\%USERNAME%\Documents\
 |`useCls`  |`Boolean` |**省略可能 (デフォルト: `False`)** <br>`True`にした場合生成したPythonコードにおいて各フォームをクラス化する &nbsp;&nbsp;`frms`が配列の場合は自動的に`True`に設定される|
 |`noMainLoop`  |`Boolean`|**省略可能 (デフォルト: `False`)** <br>`True`にした場合生成したPythonコードに`.mainloop()`を含めなくする &nbsp;&nbsp;`useCls`が`True`の場合はインスタンスの作成(例:`obj_UserForm1 = UserForm1()`)もスキップする|
 |`uniqueStyleName`  |`Boolean`|**省略可能 (デフォルト: `True`)**<br>`True`(デフォルト)にした場合、UUIDベースのユニークな識別子をttkの各スタイル名に付与する、これは同じ種類のフォームやウィジェットが複数変換され、同じPython環境内で実行された場合のスタイル名衝突を防ぐ役割を持つ |
-|`imageMode`  |`String` |**省略可能 (デフォルト: `"file"`)**<br>変換時の画像ファイルの扱いを設定する、以下の値を設定可能:<br>• `"file"` (デフォルト): 画像は出力先フォルダ内に個別の画像ファイルとして保存され、生成されたコードはそれらの画像を参照する<br>• `"disabled"`: 画像の処理そのものを無効化し、生成されたコード内でも画像の参照設定を行わない<br>• `"reference-only"`: `"file"`と同様、画像を参照するコードを生成するが画像の出力自体はスキップする 既に画像ファイルが存在する場合に有用<br>• `"base64"`: 画像をBase64文字列としてコード内に直接埋め込み単一ファイルに収める<br>• `"base64-dict"`: 画像のBase64文字列をコード内の`dict`に格納する<br>• `"base64-json"`: 画像のBase64文字列を外部の`image_base64.json`内に格納する、生成されたコードはそのJSONファイルを参照する<br>• `"base64-json-reference"`: `"base64-json"`と同様、`image_base64.json`を参照するコードを生成するがJSONファイルの生成自体はスキップする JSONファイルが既に存在する場合に有用|
+|`imageMode`  |`String` |**省略可能 (デフォルト: `"file"`)**<br>変換時の画像ファイルの扱いを設定する、以下の値を設定可能:<br>• `"file"` (デフォルト): 画像は出力先フォルダ内に個別の画像ファイルとして保存され、生成されたコードはそれらの画像を参照する<br>• `"disabled"`: 画像の処理そのものを無効化し、生成されたコード内でも画像の参照設定を行わない<br>• `"reference-only"`: `"file"`と同様、画像を参照するコードを生成するが画像の出力自体はスキップする　既に画像ファイルが存在する場合に有用<br>• `"base64"`: 画像をBase64文字列としてコード内に直接埋め込み単一ファイルに収める<br>• `"base64-dict"`: 画像のBase64文字列をコード内の`dict`に格納する<br>• `"base64-json"`: 画像のBase64文字列を外部の`image_base64.json`内に格納する、生成されたコードはそのJSONファイルを参照する<br>• `"base64-json-reference"`: `"base64-json"`と同様、`image_base64.json`を参照するコードを生成するがJSONファイルの生成自体はスキップする　JSONファイルが既に存在する場合に有用|
 
 `ConvertForm2Tkinter`は単一のユーザーフォームまたは配列内の複数のユーザーフォームを変換することが可能です
 

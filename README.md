@@ -48,10 +48,11 @@ This program converts userforms created in Microsoft Office VBA into Python Tkin
 - `.Expanded` property (`TreeView.Nodes`)
 
 > Note:  
-> When `.BackStyle = fmBackStyleTransparent`, true transparency is not supported in Tkinter. Instead, the background color is substituted as follows:
-> -   If the parent control has a `.BackColor`, that color is used.
-> -   If the parent is a `Page` (which does not expose `.BackColor`), a system default color (`&H8000000F&`) is used as a fallback, which matches the visual background color of the `Page`.
-
+> - When `.BackStyle = fmBackStyleTransparent`, true transparency is not supported in Tkinter. Instead, the background color is substituted as follows:
+>   -   If the parent control has a `.BackColor`, that color is used.
+>   -   If the parent is a `Page` (which does not expose `.BackColor`), a system default color (`&H8000000F&`) is used as a fallback, which matches the visual background color of the `Page`.
+> 
+> - Since Tkinter does not support displaying resized images natively, when exporting images with the `.PictureSizeMode` property set to `fmPictureSizeModeStretch` or `fmPictureSizeModeZoom`, the embedded images are exported after being resized to match the control's dimensions. This preserves the appearance of the original VBA UserForm as closely as possible.
 
 ## Supported Controls
 | VBA Form Class | Tkinter Class|
@@ -75,9 +76,10 @@ This program converts userforms created in Microsoft Office VBA into Python Tkin
 | `TreeView` | `ttk.Treeview`(`show="tree"`) |
 
 > Note:
-`SpinButton` behaves differently in VBA and Tkinter, so appearance may vary depending on placement.<br>
-`ScrollBar` in VBA has up/down adjustment buttons, but Tkinter’s `Scale` does not.<br>
-If unsupported controls exist on the form, the conversion will fail. If that case, please remove those controls and run the conversion again.<br>
+>- `SpinButton` behaves differently in VBA and Tkinter, so appearance may vary depending on placement.
+>- `ScrollBar` in VBA has up/down adjustment buttons, but Tkinter’s `Scale` does not.
+
+If unsupported controls exist on the form, the conversion will fail. If that case, please remove those controls and run the conversion again.
 
 
 
