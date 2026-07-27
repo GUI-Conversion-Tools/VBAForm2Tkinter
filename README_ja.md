@@ -1,4 +1,4 @@
-# VBAForm2Tkinter - Excel VBA UserForm to Tkinter Converter
+# VBAForm2Tkinter - VBA UserForm to Tkinter Converter
 🌎[English](https://github.com/GUI-Conversion-Tools/VBAForm2Tkinter/blob/main/README.md)<br><br>
 このプログラムは、MIcrosoft Office VBAにて作成したユーザーフォームをPythonのTkinter用に変換可能なプログラムです<br>
 
