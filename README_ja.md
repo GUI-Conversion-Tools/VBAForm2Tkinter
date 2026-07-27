@@ -105,12 +105,12 @@ ExcelまたはWordの場合出力先フォルダはマクロを含んだファ�
 -   **Word**: ドキュメントが配置されたディレクトリ (`MacroContainer.Path`)
 
 ```
-WorkbookFolder/
+ワークブックが配置されたフォルダ/
 ├─ MyWorkbook.xlsm
 └─ VBAForm2Tkinter_output/
    ├─ output.py
    ├─ image_base64.json
-   └─ exported images...
+   └─ エクスポートされた画像ファイル...
 ```
 
 ### 他のOfficeの場合
@@ -121,7 +121,7 @@ C:\Users\%USERNAME%\Documents\
 └─ VBAForm2Tkinter_output/
    ├─ output.py
    ├─ image_base64.json
-   └─ exported images...
+   └─ エクスポートされた画像ファイル...
 ```
 
 ドキュメントフォルダの取得に失敗した場合は、Cドライブ直下に出力先フォルダが作成されます
