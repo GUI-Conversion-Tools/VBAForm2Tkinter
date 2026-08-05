@@ -1,6 +1,6 @@
 Attribute VB_Name = "VBAForm2Tkinter"
 
-' VBAForm2Tkinter v1.5.0
+' VBAForm2Tkinter v1.5.1
 ' https://github.com/GUI-Conversion-Tools/VBAForm2Tkinter
 ' Copyright (c) 2025-2026 ZeeZeX
 ' This software is released under the MIT License.
@@ -99,7 +99,7 @@ Public Sub ConvertForm2Tkinter(ByVal frms As Variant, Optional ByVal useCls As B
         saveDir = GetSaveDirPath()
         Call CreateFolderIfDoesNotExist(saveDir)
         filePath = saveDir & "\output.py"
-        Call SaveUTF8Text_NoBOM(filePath, code)
+        Call SaveUtf8TextNoBom(filePath, code)
         MsgBox "Saved: " & filePath
     Else
         MsgBox "Conversion failed."
@@ -125,7 +125,8 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
     Dim ctrl As MSForms.Control
     Dim ctrls As Collection
     Dim item As Variant
-    Dim r As String
+    Dim result As String
+    Dim codeList As New Collection
     Const q As String = """"
     Dim fontStyle As String
     Dim fontOpts As String
@@ -182,7 +183,6 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
     saveDir = GetSaveDirPath()
     Call CreateFolderIfDoesNotExist(saveDir)
     
-    r = ""
     
     If IsArray(frms) Then
         useCls = True
@@ -198,23 +198,23 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
         prefix = ""
     End If
     
-    r = r & "import tkinter as tk" & vbLf
-    r = r & "from tkinter import ttk" & vbLf
-    r = r & "from tkinter import font" & vbLf
-    r = r & "import pathlib" & vbLf
-    If InStr(imageMode, "json") <> 0 Then r = r & "import json" & vbLf
-    r = r & vbLf
-    r = r & "BASE_DIR = pathlib.Path(__file__).resolve().parent" & vbLf
+    codeList.Add "import tkinter as tk" & vbLf
+    codeList.Add "from tkinter import ttk" & vbLf
+    codeList.Add "from tkinter import font" & vbLf
+    codeList.Add "import pathlib" & vbLf
+    If InStr(imageMode, "json") <> 0 Then codeList.Add "import json" & vbLf
+    codeList.Add vbLf
+    codeList.Add "BASE_DIR = pathlib.Path(__file__).resolve().parent" & vbLf
     
     uniqueStringToReplace = GenerateUUIDv4() & GenerateUUIDv4() & GenerateUUIDv4() & GenerateUUIDv4()
-    r = r & "" & vbLf
-    r = r & uniqueStringToReplace
+    codeList.Add "" & vbLf
+    codeList.Add uniqueStringToReplace
     
     
     If ContainsValue(Array("base64-json", "base64-json-reference"), imageMode) Then
         ' Compatibility note: In Python 3.5 and earlier, pathlib.Path objects cannot be passed directly to open(). Convert them to strings using str() before passing them.
-        r = r & "with open(str(BASE_DIR / r""image_base64.json""), ""r"", encoding=""utf-8"") as f:" & vbLf
-        r = r & "    image_base64_dict = json.load(f)" & vbLf & vbLf
+        codeList.Add "with open(str(BASE_DIR / r""image_base64.json""), ""r"", encoding=""utf-8"") as f:" & vbLf
+        codeList.Add "    image_base64_dict = json.load(f)" & vbLf & vbLf
     End If
     
     
@@ -227,8 +227,8 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
         
         If ContainsValue(unavailableNames, LCase(root.Name)) Then
             MsgBox GenerateUnavailableNameMessage(root)
-            r = ""
-            GenerateTkinterCode = r
+            result = ""
+            GenerateTkinterCode = result
             Exit Function
         End If
         unavailableNames(0) = LCase(FORM_WINDOW_NAME)
@@ -240,33 +240,33 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
         formName = GenerateCtrlVarName(root, prefix, useCls)
         
         If useCls Then
-            r = r & "class " & root.Name & ":" & vbLf & "    " & "def __init__(self, parent=None):" & vbLf
-            r = r & indent & "if parent is None:" & vbLf & _
+            codeList.Add "class " & root.Name & ":" & vbLf & "    " & "def __init__(self, parent=None):" & vbLf
+            codeList.Add indent & "if parent is None:" & vbLf & _
             indent & "    " & formName & " = " & "tk.Tk()" & vbLf & _
             indent & "else:" & vbLf & _
             indent & "    " & formName & " = " & "tk.Toplevel(parent)" & vbLf
         Else
-            r = r & indent & formName & " = " & "tk.Tk()" & vbLf
+            codeList.Add indent & formName & " = " & "tk.Tk()" & vbLf
         End If
         
         
         caption = root.caption
         caption = Convert2PythonFormatText(caption)
-        r = r & indent & formName & ".title(" & q & caption & q & ")" & vbLf
-        r = r & indent & formName & ".geometry(" & q & pixelWidth & "x" & pixelHeight & q & ")" & vbLf
-        r = r & indent & formName & ".resizable(False, False)" & vbLf
-        r = r & indent & formName & ".configure(bg=" & q & FormColorToHex(root.BackColor) & q & ")" & vbLf
-        r = r & indent & formName & GetBorderSetting(root) & vbLf
+        codeList.Add indent & formName & ".title(" & q & caption & q & ")" & vbLf
+        codeList.Add indent & formName & ".geometry(" & q & pixelWidth & "x" & pixelHeight & q & ")" & vbLf
+        codeList.Add indent & formName & ".resizable(False, False)" & vbLf
+        codeList.Add indent & formName & ".configure(bg=" & q & FormColorToHex(root.BackColor) & q & ")" & vbLf
+        codeList.Add indent & formName & GetBorderSetting(root) & vbLf
         
         cursorType = GetControlCursorType(root)
         If cursorType <> "" Then
-            r = r & indent & formName & ".configure(cursor=" & q & cursorType & q & ")" & vbLf
+            codeList.Add indent & formName & ".configure(cursor=" & q & cursorType & q & ")" & vbLf
         End If
         
-        r = r & vbLf
-        r = r & indent & prefix & "style = ttk.Style()" & vbLf
-        r = r & indent & prefix & "style.theme_use('default')" & vbLf
-        r = r & vbLf
+        codeList.Add vbLf
+        codeList.Add indent & prefix & "style = ttk.Style()" & vbLf
+        codeList.Add indent & prefix & "style.theme_use('default')" & vbLf
+        codeList.Add vbLf
         Set ctrls = SortFormControlsByDepth(root.Controls)
         For Each ctrl In ctrls
             controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
@@ -299,8 +299,8 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
             
             If ContainsValue(unavailableNames, LCase(ctrl.Name)) Then
                 MsgBox GenerateUnavailableNameMessage(ctrl)
-                r = ""
-                GenerateTkinterCode = r
+                result = ""
+                GenerateTkinterCode = result
                 Exit Function
             End If
             
@@ -312,12 +312,12 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                 pixelHeight = UserFormSizeToPixel(ctrl.height)
                 
                 
-                r = r & indent & controlVarName & " = " & GetTkWidgetName(ctrl) & "(" & parentVarName & ")" & vbLf
-                r = r & indent & controlVarName & ".place(x=" & pixelLeft & ", y=" & pixelTop & ", width=" & pixelWidth & ", height=" & pixelHeight & ")" & vbLf
+                codeList.Add indent & controlVarName & " = " & GetTkWidgetName(ctrl) & "(" & parentVarName & ")" & vbLf
+                codeList.Add indent & controlVarName & ".place(x=" & pixelLeft & ", y=" & pixelTop & ", width=" & pixelWidth & ", height=" & pixelHeight & ")" & vbLf
                 
                 If GetTkWidgetName(ctrl) = "tk.LabelFrame" Or ContainsValue(Array("Label", "CommandButton", "TextBox", "SpinButton", "ListBox", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
                     ' Set ForeColor
-                    r = r & indent & controlVarName & ".configure(fg=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
+                    codeList.Add indent & controlVarName & ".configure(fg=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
                 End If
                 
                 If ContainsValue(Array("Label", "CommandButton", "Frame", "TextBox", "SpinButton", "ListBox", "CheckBox", "ToggleButton", "OptionButton", "Image"), TypeName(ctrl)) Then
@@ -334,17 +334,17 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                             End If
                         End If
                     End If
-                    r = r & indent & controlVarName & ".configure(bg=" & q & colorCode & q & ")" & vbLf
+                    codeList.Add indent & controlVarName & ".configure(bg=" & q & colorCode & q & ")" & vbLf
                     
                     If ContainsValue(Array("CommandButton", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
                         ' Set the colors when the button is pressed
-                        r = r & indent & controlVarName & ".configure(activeforeground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
-                        r = r & indent & controlVarName & ".configure(activebackground=" & q & colorCode & q & ")" & vbLf
+                        codeList.Add indent & controlVarName & ".configure(activeforeground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
+                        codeList.Add indent & controlVarName & ".configure(activebackground=" & q & colorCode & q & ")" & vbLf
                     End If
                     
                     If TypeName(ctrl) = "ToggleButton" Then
-                        r = r & indent & controlVarName & ".configure(indicatoron=0)" & vbLf
-                        r = r & indent & controlVarName & ".configure(selectcolor=" & q & colorCode & q & ")" & vbLf
+                        codeList.Add indent & controlVarName & ".configure(indicatoron=0)" & vbLf
+                        codeList.Add indent & controlVarName & ".configure(selectcolor=" & q & colorCode & q & ")" & vbLf
                     End If
                     
                 End If
@@ -352,40 +352,40 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                 If GetTkWidgetName(ctrl) = "tk.LabelFrame" Or ContainsValue(Array("Label", "CommandButton", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
                     caption = ctrl.caption
                     caption = Convert2PythonFormatText(caption)
-                    r = r & indent & controlVarName & ".configure(text=" & q & caption & q & ")" & vbLf
+                    codeList.Add indent & controlVarName & ".configure(text=" & q & caption & q & ")" & vbLf
                 End If
                 
                 
                 If TypeName(ctrl) = "TextBox" Then
                     If GetTkWidgetName(ctrl) = "tk.Entry" Then
-                        r = r & indent & controlVarName & ".insert(0, " & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
+                        codeList.Add indent & controlVarName & ".insert(0, " & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
                         If ctrl.PasswordChar <> "" Then
-                            r = r & indent & controlVarName & ".configure(show=" & q & Left(ctrl.PasswordChar, 1) & q & ")" & vbLf
+                            codeList.Add indent & controlVarName & ".configure(show=" & q & Left(ctrl.PasswordChar, 1) & q & ")" & vbLf
                         End If
                         
                         If ctrl.Locked Then
-                             r = r & indent & controlVarName & ".configure(state=" & q & "readonly" & q & ")" & vbLf
+                             codeList.Add indent & controlVarName & ".configure(state=" & q & "readonly" & q & ")" & vbLf
                         End If
                         
                     ElseIf GetTkWidgetName(ctrl) = "tk.Text" Then
-                        r = r & indent & controlVarName & ".insert(" & q & "1.0" & q & ", " & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
+                        codeList.Add indent & controlVarName & ".insert(" & q & "1.0" & q & ", " & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
                         
                         If ctrl.Locked Then
-                             r = r & indent & controlVarName & ".configure(state=" & q & "disabled" & q & ")" & vbLf
+                             codeList.Add indent & controlVarName & ".configure(state=" & q & "disabled" & q & ")" & vbLf
                         End If
                         
                         If Not ctrl.WordWrap Then
-                            r = r & indent & controlVarName & ".configure(wrap=" & q & "none" & q & ")" & vbLf
+                            codeList.Add indent & controlVarName & ".configure(wrap=" & q & "none" & q & ")" & vbLf
                         End If
                         
                         Select Case ctrl.ScrollBars
                             Case fmScrollBarsHorizontal
-                                r = r & SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                                codeList.Add SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
                             Case fmScrollBarsVertical
-                                r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                                codeList.Add SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
                             Case fmScrollBarsBoth
-                                r = r & SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
-                                r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                                codeList.Add SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                                codeList.Add SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
                         End Select
                         
                     End If
@@ -393,8 +393,8 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                 
                 If TypeName(ctrl) = "ComboBox" Then
                     styleName = tkStyleBaseName & ".TCombobox"
-                    r = r & indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", foreground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
+                    codeList.Add indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", foreground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
                     colorCode = FormColorToHex(ctrl.BackColor)
                     
                     If ctrl.BackStyle = fmBackStyleTransparent Then
@@ -405,44 +405,44 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                         End If
                     End If
                     
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", fieldbackground=" & q & colorCode & q & ")" & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", fieldbackground=" & q & colorCode & q & ")" & vbLf
                     
-                    r = r & indent & itemsListName & " = " & GetListBoxValue(ctrl, indent) & vbLf
-                    r = r & indent & controlVarName & ".configure(value=" & itemsListName & ")" & vbLf
-                    r = r & indent & controlVarName & ".set(" & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
+                    codeList.Add indent & itemsListName & " = " & GetListBoxValue(ctrl, indent) & vbLf
+                    codeList.Add indent & controlVarName & ".configure(value=" & itemsListName & ")" & vbLf
+                    codeList.Add indent & controlVarName & ".set(" & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
                     
                     If ctrl.Style = fmStyleDropDownList Then
-                         r = r & indent & controlVarName & ".configure(state=" & q & "readonly" & q & ")" & vbLf
-                         r = r & indent & prefix & "style.map(" & ttkStyleRef & ", foreground=[(" & q & "readonly" & q & ", " & q & FormColorToHex(ctrl.ForeColor) & q & ")]" & ")" & vbLf
-                         r = r & indent & prefix & "style.map(" & ttkStyleRef & ", fieldbackground=[(" & q & "readonly" & q & ", " & q & colorCode & q & ")]" & ")" & vbLf
-                         r = r & indent & prefix & "style.map(" & ttkStyleRef & ", selectforeground=[(" & q & "readonly" & q & ", " & q & FormColorToHex(ctrl.ForeColor) & q & ")]" & ")" & vbLf
-                         r = r & indent & prefix & "style.map(" & ttkStyleRef & ", selectbackground=[(" & q & "readonly" & q & ", " & q & colorCode & q & ")]" & ")" & vbLf
+                         codeList.Add indent & controlVarName & ".configure(state=" & q & "readonly" & q & ")" & vbLf
+                         codeList.Add indent & prefix & "style.map(" & ttkStyleRef & ", foreground=[(" & q & "readonly" & q & ", " & q & FormColorToHex(ctrl.ForeColor) & q & ")]" & ")" & vbLf
+                         codeList.Add indent & prefix & "style.map(" & ttkStyleRef & ", fieldbackground=[(" & q & "readonly" & q & ", " & q & colorCode & q & ")]" & ")" & vbLf
+                         codeList.Add indent & prefix & "style.map(" & ttkStyleRef & ", selectforeground=[(" & q & "readonly" & q & ", " & q & FormColorToHex(ctrl.ForeColor) & q & ")]" & ")" & vbLf
+                         codeList.Add indent & prefix & "style.map(" & ttkStyleRef & ", selectbackground=[(" & q & "readonly" & q & ", " & q & colorCode & q & ")]" & ")" & vbLf
                     End If
                     
                     If ctrl.Locked Then
-                         r = r & indent & controlVarName & ".configure(state=" & q & "disabled" & q & ")" & vbLf
+                         codeList.Add indent & controlVarName & ".configure(state=" & q & "disabled" & q & ")" & vbLf
                     End If
                     
                 End If
                 
                 
                 If TypeName(ctrl) = "ListBox" Then
-                    r = r & indent & itemsListName & " = " & GetListBoxValue(ctrl, indent) & vbLf
-                    r = r & indent & controlVarName & ".insert(tk.END, " & "*" & itemsListName & ")" & vbLf
+                    codeList.Add indent & itemsListName & " = " & GetListBoxValue(ctrl, indent) & vbLf
+                    codeList.Add indent & controlVarName & ".insert(tk.END, " & "*" & itemsListName & ")" & vbLf
                     
                     Select Case ctrl.MultiSelect
                         Case fmMultiSelectMulti
-                            r = r & indent & controlVarName & ".configure(selectmode=" & q & "multiple" & q & ")" & vbLf
+                            codeList.Add indent & controlVarName & ".configure(selectmode=" & q & "multiple" & q & ")" & vbLf
                         Case fmMultiSelectExtended
-                            r = r & indent & controlVarName & ".configure(selectmode=" & q & "extended" & q & ")" & vbLf
+                            codeList.Add indent & controlVarName & ".configure(selectmode=" & q & "extended" & q & ")" & vbLf
                     End Select
                     
                     If ctrl.Locked Then
-                         r = r & indent & controlVarName & ".configure(state=" & q & "disabled" & q & ")" & vbLf
-                         r = r & indent & controlVarName & ".configure(disabledforeground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
+                         codeList.Add indent & controlVarName & ".configure(state=" & q & "disabled" & q & ")" & vbLf
+                         codeList.Add indent & controlVarName & ".configure(disabledforeground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
                     End If
                     
-                    r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, True)
+                    codeList.Add SetVScrollBarToWidget(ctrl, indent, prefix, useCls, True)
                     
                 End If
                 
@@ -462,10 +462,10 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                         Case Else
                             orientation = "Vertical"
                     End Select
-                    r = r & indent & controlVarName & ".configure(from_=" & ctrl.Min & ", to=" & ctrl.Max & ",orient=" & q & LCase(orientation) & q & ")" & vbLf
+                    codeList.Add indent & controlVarName & ".configure(from_=" & ctrl.Min & ", to=" & ctrl.Max & ",orient=" & q & LCase(orientation) & q & ")" & vbLf
                     styleName = tkStyleBaseName & "." & orientation & ".TScale"
-                    r = r & indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
+                    codeList.Add indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
                     
                 End If
                 
@@ -474,26 +474,26 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                     rowHeight = GetTextSizeFromCtrlFontSetting(ctrl, "TEST")(1)
                     rowPixelHeight = UserFormSizeToPixel(rowHeight)
                     ttkFontSetting = GenerateTtkFontSetting(ctrl)
-                    r = r & indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & " + "".Heading""" & ", " & ttkFontSetting & ")" & vbLf
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", " & ttkFontSetting & ")" & vbLf
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", rowheight=" & rowPixelHeight & ")" & vbLf
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", foreground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", fieldbackground=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
+                    codeList.Add indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & " + "".Heading""" & ", " & ttkFontSetting & ")" & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", " & ttkFontSetting & ")" & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", rowheight=" & rowPixelHeight & ")" & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", foreground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", fieldbackground=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
                     If ctrl.MultiSelect Then
-                        r = r & indent & controlVarName & ".configure(selectmode=" & q & "extended" & q & ")" & vbLf
+                        codeList.Add indent & controlVarName & ".configure(selectmode=" & q & "extended" & q & ")" & vbLf
                     Else
-                        r = r & indent & controlVarName & ".configure(selectmode=" & q & "browse" & q & ")" & vbLf
+                        codeList.Add indent & controlVarName & ".configure(selectmode=" & q & "browse" & q & ")" & vbLf
                     End If
-                    r = r & indent & listviewHeaderNames & " = " & GenerateListViewHeaders(ctrl) & vbLf
-                    r = r & indent & controlVarName & ".configure(columns=" & listviewHeaderNames & ",show=" & q & "headings" & q & ")" & vbLf
-                    r = r & DefineListViewColumns(ctrl, indent, prefix, useCls) & vbLf
-                    r = r & indent & itemsListName & " = " & GetListViewItems(ctrl, indent) & vbLf
-                    r = r & indent & "for item in " & itemsListName & ":" & vbLf
-                    r = r & indent & "    " & controlVarName & ".insert("""", tk.END, values=item)" & vbLf
-                    r = r & SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
-                    r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                    codeList.Add indent & listviewHeaderNames & " = " & GenerateListViewHeaders(ctrl) & vbLf
+                    codeList.Add indent & controlVarName & ".configure(columns=" & listviewHeaderNames & ",show=" & q & "headings" & q & ")" & vbLf
+                    codeList.Add DefineListViewColumns(ctrl, indent, prefix, useCls) & vbLf
+                    codeList.Add indent & itemsListName & " = " & GetListViewItems(ctrl, indent) & vbLf
+                    codeList.Add indent & "for item in " & itemsListName & ":" & vbLf
+                    codeList.Add indent & "    " & controlVarName & ".insert("""", tk.END, values=item)" & vbLf
+                    codeList.Add SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                    codeList.Add SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
                 End If
                 
                 If IsTreeView(ctrl) Then
@@ -502,13 +502,13 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                     rowPixelHeight = UserFormSizeToPixel(rowHeight)
                     nodeDictName = controlVarName & "_node_dict"
                     ttkFontSetting = GenerateTtkFontSetting(ctrl)
-                    r = r & indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", " & ttkFontSetting & ")" & vbLf
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", rowheight=" & rowPixelHeight & ")" & vbLf
-                    r = r & indent & controlVarName & ".configure(selectmode=" & q & "browse" & q & ")" & vbLf
+                    codeList.Add indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", " & ttkFontSetting & ")" & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", rowheight=" & rowPixelHeight & ")" & vbLf
+                    codeList.Add indent & controlVarName & ".configure(selectmode=" & q & "browse" & q & ")" & vbLf
                     Set treeviewNodes = GetAllTreeViewNodesBfs(ctrl)
-                    r = r & indent & controlVarName & ".configure(show=" & q & "tree" & q & ")" & vbLf
-                    r = r & indent & nodeDictName & " = {}" & vbLf
+                    codeList.Add indent & controlVarName & ".configure(show=" & q & "tree" & q & ")" & vbLf
+                    codeList.Add indent & nodeDictName & " = {}" & vbLf
                     For Each item In treeviewNodes
                         Set node = item(0)
                         nodeVarName = nodeDictName & "[" & q & Convert2PythonFormatText(node.Key) & q & "]"
@@ -517,7 +517,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                         Else
                             nodeParentVarName = nodeDictName & "[" & q & Convert2PythonFormatText(node.Parent.Key) & q & "]"
                         End If
-                        r = r & indent & nodeVarName & " = " & controlVarName & ".insert(" & nodeParentVarName & ", tk.END, text=" & q & Convert2PythonFormatText(node.text) & q & ", open=" & node.Expanded & ")" & vbLf
+                        codeList.Add indent & nodeVarName & " = " & controlVarName & ".insert(" & nodeParentVarName & ", tk.END, text=" & q & Convert2PythonFormatText(node.text) & q & ", open=" & node.Expanded & ")" & vbLf
                     Next item
                     If HasScrollProperty(ctrl) Then
                         enableScrollBar = ctrl.Scroll
@@ -525,28 +525,28 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                         enableScrollBar = True
                     End If
                     If enableScrollBar Then
-                        r = r & SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
-                        r = r & SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                        codeList.Add SetHScrollBarToWidget(ctrl, indent, prefix, useCls, False)
+                        codeList.Add SetVScrollBarToWidget(ctrl, indent, prefix, useCls, False)
                     End If
                 End If
                 
                 ' Set each Caption and font in MultiPage, font size is rounded
                 If TypeName(ctrl) = "MultiPage" Then
                     styleName = tkStyleBaseName & ".TNotebook"
-                    r = r & indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
+                    codeList.Add indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
                     
                     ttkFontSetting = GenerateTtkFontSetting(ctrl)
                     
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
                     
                     Select Case ctrl.Style
                         Case fmTabStyleTabs
-                             r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", borderwidth=2, relief=" & q & "raised" & q & ")" & vbLf
+                             codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", borderwidth=2, relief=" & q & "raised" & q & ")" & vbLf
                         Case fmTabStyleButtons
-                             r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", borderwidth=0, relief=" & q & "flat" & q & ")" & vbLf
+                             codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", borderwidth=0, relief=" & q & "flat" & q & ")" & vbLf
                         Case fmTabStyleNone
-                             r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", borderwidth=0, relief=" & q & "flat" & q & ")" & vbLf
-                             r = r & indent & prefix & "style.layout(" & ttkStyleRef & " + "".Tab"", [])" & vbLf
+                             codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", borderwidth=0, relief=" & q & "flat" & q & ")" & vbLf
+                             codeList.Add indent & prefix & "style.layout(" & ttkStyleRef & " + "".Tab"", [])" & vbLf
                     End Select
                    
                     Select Case ctrl.TabOrientation
@@ -562,18 +562,18 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                             tabPosition = "n"
                     End Select
                     
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & ", tabposition=" & q & tabPosition & q & ")" & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", tabposition=" & q & tabPosition & q & ")" & vbLf
                     
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & " + "".Tab""" & ", " & ttkFontSetting & ")" & vbLf
-                    r = r & indent & prefix & "style.configure(" & ttkStyleRef & " + "".Tab""" & ", foreground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & " + "".Tab""" & ", " & ttkFontSetting & ")" & vbLf
+                    codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & " + "".Tab""" & ", foreground=" & q & FormColorToHex(ctrl.ForeColor) & q & ")" & vbLf
                     
                     
                     For Each item In ctrl.Pages
                         childVarName = GenerateCtrlVarName(item, prefix, useCls)
                         caption = item.caption
                         caption = Convert2PythonFormatText(caption)
-                        r = r & indent & childVarName & " = tk.Frame(" & controlVarName & ", bg=" & q & FormColorToHex(&H8000000F) & q & ")" & vbLf
-                        r = r & indent & controlVarName & ".add(" & childVarName & ", text=" & q & caption & q & ")" & vbLf
+                        codeList.Add indent & childVarName & " = tk.Frame(" & controlVarName & ", bg=" & q & FormColorToHex(&H8000000F) & q & ")" & vbLf
+                        codeList.Add indent & controlVarName & ".add(" & childVarName & ", text=" & q & caption & q & ")" & vbLf
                     Next
                     
                     
@@ -590,24 +590,24 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                     If ctrl.Font.Underline Then fontOpts = fontOpts & ", underline=1"
                     If ctrl.Font.Strikethrough Then fontOpts = fontOpts & ", overstrike=1"
                     
-                    r = r & indent & controlVarName & ".configure(font=font.Font(family=" & q & ctrl.Font.Name & q & ", size=" & Round(ctrl.Font.Size) & fontStyle & fontOpts & "))" & vbLf
+                    codeList.Add indent & controlVarName & ".configure(font=font.Font(family=" & q & ctrl.Font.Name & q & ", size=" & Round(ctrl.Font.Size) & fontStyle & fontOpts & "))" & vbLf
                 End If
                 
                 
                 If ContainsValue(Array("Frame", "TextBox", "Label", "ListBox", "Image"), TypeName(ctrl)) Then
                     ' Tkinter's Combobox does not support customizing border colors or relief
-                    r = r & indent & controlVarName & GetBorderSetting(ctrl) & vbLf
+                    codeList.Add indent & controlVarName & GetBorderSetting(ctrl) & vbLf
                 End If
                 
                 If GetTkWidgetName(ctrl) <> "tk.Text" And ContainsValue(Array("Label", "TextBox", "ComboBox", "CheckBox", "ToggleButton", "OptionButton"), TypeName(ctrl)) Then
-                    r = r & GetTextAlignSetting(ctrl, indent, prefix, useCls) & vbLf
+                    codeList.Add GetTextAlignSetting(ctrl, indent, prefix, useCls) & vbLf
                 End If
                 
                 ' Set mouse cursor
                 If TypeName(ctrl) <> "MultiPage" Then
                     cursorType = GetControlCursorType(ctrl)
                     If cursorType <> "" Then
-                        r = r & indent & controlVarName & ".configure(cursor=" & q & cursorType & q & ")" & vbLf
+                        codeList.Add indent & controlVarName & ".configure(cursor=" & q & cursorType & q & ")" & vbLf
                     End If
                 End If
                 
@@ -709,36 +709,36 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                         End If
                         
                         If ContainsValue(Array("base64-dict", "base64-json", "base64-json-reference"), imageMode) Then
-                            r = r & indent & controlVarName & "_photo = tk.PhotoImage(data=image_base64_dict[" & q & pictureName & q & "])" & vbLf
+                            codeList.Add indent & controlVarName & "_photo = tk.PhotoImage(data=image_base64_dict[" & q & pictureName & q & "])" & vbLf
                         ElseIf imageMode = "base64" Then
-                            r = r & indent & controlVarName & "_photo = tk.PhotoImage(data=" & q & base64Str & q & ")" & vbLf
+                            codeList.Add indent & controlVarName & "_photo = tk.PhotoImage(data=" & q & base64Str & q & ")" & vbLf
                         ElseIf ContainsValue(Array("file", "reference-only"), imageMode) Then
-                            r = r & indent & controlVarName & "_photo = tk.PhotoImage(file=BASE_DIR / r" & q & fso.GetFileName(picturePath) & q & ")" & vbLf
+                            codeList.Add indent & controlVarName & "_photo = tk.PhotoImage(file=BASE_DIR / r" & q & fso.GetFileName(picturePath) & q & ")" & vbLf
                         End If
                         
-                        r = r & indent & controlVarName & ".create_image(" & canvasCoordX & ", " & canvasCoordY & ", image=" & controlVarName & "_photo" & ", anchor=" & q & canvasAnchor & q & ")" & vbLf
+                        codeList.Add indent & controlVarName & ".create_image(" & canvasCoordX & ", " & canvasCoordY & ", image=" & controlVarName & "_photo" & ", anchor=" & q & canvasAnchor & q & ")" & vbLf
                     Else
-                        r = r & indent & "#" & controlVarName & "_photo = tk.PhotoImage(file=r" & q & "" & q & ")" & vbLf
-                        r = r & indent & "#" & controlVarName & ".create_image(" & canvasCoordX & ", " & canvasCoordY & ", image=" & controlVarName & "_photo" & ", anchor=" & q & canvasAnchor & q & ")" & vbLf
+                        codeList.Add indent & "#" & controlVarName & "_photo = tk.PhotoImage(file=r" & q & "" & q & ")" & vbLf
+                        codeList.Add indent & "#" & controlVarName & ".create_image(" & canvasCoordX & ", " & canvasCoordY & ", image=" & controlVarName & "_photo" & ", anchor=" & q & canvasAnchor & q & ")" & vbLf
                     End If
                     
 
                 End If
                 
                 
-                r = r & vbLf
+                codeList.Add vbLf
                 
             Else
                 MsgBox GenerateUnsupportedControlMessage(ctrl)
-                r = ""
-                GenerateTkinterCode = r
+                result = ""
+                GenerateTkinterCode = result
                 Exit Function
             End If
         Next ctrl
-        r = r & SetTkRadiobuttonValues(ctrls, indent, prefix, useCls) & vbLf
-        r = r & SetTkCheckbuttonValues(ctrls, indent, prefix, useCls) & vbLf
+        codeList.Add SetTkRadiobuttonValues(ctrls, indent, prefix, useCls) & vbLf
+        codeList.Add SetTkCheckbuttonValues(ctrls, indent, prefix, useCls) & vbLf
         If Not useCls And Not noMainLoop Then
-            r = r & formName & ".mainloop()" & vbLf
+            codeList.Add formName & ".mainloop()" & vbLf
         End If
     Next root
     
@@ -748,34 +748,36 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
             clsNumber = clsNumber + 1
             instanceName = "obj_" & root.Name
             If clsNumber <= 1 Then
-                r = r & instanceName & " = " & root.Name & "()" & vbLf
+                codeList.Add instanceName & " = " & root.Name & "()" & vbLf
                 toplevelInstanceName = instanceName
             Else
-                r = r & instanceName & " = " & root.Name & "(" & toplevelInstanceName & "." & FORM_WINDOW_NAME & ")" & vbLf
+                codeList.Add instanceName & " = " & root.Name & "(" & toplevelInstanceName & "." & FORM_WINDOW_NAME & ")" & vbLf
             End If
         Next
-        r = r & toplevelInstanceName & "." & FORM_WINDOW_NAME & ".mainloop()"
+        codeList.Add toplevelInstanceName & "." & FORM_WINDOW_NAME & ".mainloop()"
     End If
     
+    result = JoinCollection(codeList, "")
+    
     If ContainsValue(Array("base64-dict", "base64-json", "base64-json-reference"), imageMode) Then
-        base64PictureDictStr = "{" & vbLf & Join(Collection2Array(base64PictureDictStrs), "," & vbLf) & vbLf & "}" & vbLf
+        base64PictureDictStr = "{" & vbLf & JoinCollection(base64PictureDictStrs, "," & vbLf) & vbLf & "}" & vbLf
         If imageMode = "base64-dict" Then
-            r = VBA.Replace(r, uniqueStringToReplace, "image_base64_dict = " & base64PictureDictStr)
+            result = VBA.Replace(result, uniqueStringToReplace, "image_base64_dict = " & base64PictureDictStr)
         Else
-            r = VBA.Replace(r, uniqueStringToReplace, "")
+            result = VBA.Replace(result, uniqueStringToReplace, "")
         End If
         
         
         If imageMode = "base64-json" Then
-            Call SaveUTF8Text_NoBOM(saveDir & "\" & "image_base64.json", base64PictureDictStr)
+            Call SaveUtf8TextNoBom(saveDir & "\" & "image_base64.json", base64PictureDictStr)
         End If
     
     Else
-        r = VBA.Replace(r, uniqueStringToReplace, "")
+        result = VBA.Replace(result, uniqueStringToReplace, "")
     End If
     
     
-    GenerateTkinterCode = r
+    GenerateTkinterCode = result
 End Function
 
 Private Function GetSaveDirPath() As String
@@ -873,7 +875,7 @@ Private Function IsRootForm(ByVal ctrl As Object) As Boolean
 End Function
 
 Private Function GetBorderSetting(ByVal ctrl As Object) As String
-    Dim r As String
+    Dim result As String
     Const q As String = """"
     Dim borderWidth As Long
     Dim relief As String
@@ -906,19 +908,19 @@ Private Function GetBorderSetting(ByVal ctrl As Object) As String
             End Select
     End Select
 
-    r = ".configure(relief=" & relief & ", bd=" & borderWidth & ", highlightthickness=" & highlightBorderWidth & ", highlightbackground=" & q & hexBorderColor & q & ", highlightcolor=" & q & hexBorderColor & q & ")"
-    GetBorderSetting = r
+    result = ".configure(relief=" & relief & ", bd=" & borderWidth & ", highlightthickness=" & highlightBorderWidth & ", highlightbackground=" & q & hexBorderColor & q & ", highlightcolor=" & q & hexBorderColor & q & ")"
+    GetBorderSetting = result
 End Function
 
 
 Private Function GetTextAlignSetting(ByVal ctrl As Object, ByVal indent As String, ByVal prefix As String, ByVal useCls As Boolean) As String
-    Dim r As String
+    Dim result As String
     Const q As String = """"
     Dim anchor As String
     Dim justify As String
     Dim controlVarName As String
     controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
-    r = ""
+    result = ""
     If ContainsValue(Array("CheckBox", "OptionButton", "ToggleButton"), TypeName(ctrl)) Then
         Select Case ctrl.TextAlign
             Case fmTextAlignLeft
@@ -951,10 +953,10 @@ Private Function GetTextAlignSetting(ByVal ctrl As Object, ByVal indent As Strin
         End Select
     End If
     If Not ContainsValue(Array("TextBox", "ComboBox"), TypeName(ctrl)) Then
-        r = indent & controlVarName & ".configure(anchor=" & q & anchor & q & ")" & vbLf
+        result = indent & controlVarName & ".configure(anchor=" & q & anchor & q & ")" & vbLf
     End If
-    r = r & indent & controlVarName & ".configure(justify=" & q & justify & q & ")"
-    GetTextAlignSetting = r
+    result = result & indent & controlVarName & ".configure(justify=" & q & justify & q & ")"
+    GetTextAlignSetting = result
 End Function
 
 Private Function GenerateTtkStyleRef(ByVal tkVarName As String) As String
@@ -970,18 +972,18 @@ Private Function GenerateTtkStyleDefinitionCode(ByVal tkVarName As String, ByVal
     ' -> self.ComboBox1.configure(style=self.__class__.__name__ + "." + "ComboBox1.style.TComboBox")
     ' GenerateTtkStyleDefinitionCode("ComboBox1", "ComboBox1.style.TComboBox", False)
     ' -> ComboBox1.configure(style="ComboBox1.style.TComboBox")
-    
+    Dim codeList As New Collection
     Dim code As String
     Const q As String = """"
-    code = tkVarName & ".configure(style="
+    codeList.Add tkVarName & ".configure(style="
     
     If useCls Then
-        code = code & "self.__class__.__name__ + "
-        code = code & q & "." & styleName & q & ")"
+        codeList.Add "self.__class__.__name__ + "
+        codeList.Add q & "." & styleName & q & ")"
     Else
-        code = code & q & styleName & q & ")"
+        codeList.Add q & styleName & q & ")"
     End If
-    
+    code = JoinCollection(codeList, "")
     GenerateTtkStyleDefinitionCode = code
 End Function
 
@@ -1000,61 +1002,61 @@ Private Function GenerateTtkFontSetting(ByVal ctrl As Object) As String
     If ctrl.Font.Underline Then ttkFontStyles.Add "underline"
     If ctrl.Font.Strikethrough Then ttkFontStyles.Add "overstrike"
     
-    ttkFontStyleSetting = q & Join(Collection2Array(ttkFontStyles), " ") & q
+    ttkFontStyleSetting = q & JoinCollection(ttkFontStyles, " ") & q
     ttkFontSetting = "font=(" & Join(Array(q & ctrl.Font.Name & q, Round(ctrl.Font.Size), ttkFontStyleSetting), ", ") & ")"
     GenerateTtkFontSetting = ttkFontSetting
 End Function
 
 Private Function GetTkWidgetName(ByVal ctrl As Object) As String
-    Dim r As String
+    Dim result As String
     Select Case TypeName(ctrl)
         Case "Label"
-            r = "tk.Label"
+            result = "tk.Label"
         Case "CommandButton"
-            r = "tk.Button"
+            result = "tk.Button"
         Case "Frame"
             If ctrl.caption = "" Then
-                r = "tk.Frame"
+                result = "tk.Frame"
             Else
-                r = "tk.LabelFrame"
+                result = "tk.LabelFrame"
             End If
         Case "TextBox"
             If ctrl.MultiLine Then
-                r = "tk.Text"
+                result = "tk.Text"
             Else
-                r = "tk.Entry"
+                result = "tk.Entry"
             End If
         Case "SpinButton"
-            r = "tk.Spinbox"
+            result = "tk.Spinbox"
         Case "ListBox"
-            r = "tk.Listbox"
+            result = "tk.Listbox"
         Case "CheckBox"
-            r = "tk.Checkbutton"
+            result = "tk.Checkbutton"
         Case "ToggleButton"
-            r = "tk.Checkbutton"
+            result = "tk.Checkbutton"
         Case "OptionButton"
-            r = "tk.Radiobutton"
+            result = "tk.Radiobutton"
         Case "Image"
-            r = "tk.Canvas"
+            result = "tk.Canvas"
         Case "ScrollBar"
-            r = "ttk.Scale"
+            result = "ttk.Scale"
         Case "ComboBox"
-            r = "ttk.Combobox"
+            result = "ttk.Combobox"
         Case "MultiPage"
-            r = "ttk.Notebook"
+            result = "ttk.Notebook"
         Case Else
-            r = ""
+            result = ""
             
             If IsListView(ctrl) Then
-                r = "ttk.Treeview"
+                result = "ttk.Treeview"
             End If
             
             If IsTreeView(ctrl) Then
-                r = "ttk.Treeview"
+                result = "ttk.Treeview"
             End If
             
     End Select
-    GetTkWidgetName = r
+    GetTkWidgetName = result
 End Function
 
 
@@ -1116,15 +1118,15 @@ Private Function GetControlCursorType(ByVal ctrl As Object) As String
 End Function
 
 Private Function SetTkRadiobuttonValues(ByVal ctrls As Variant, ByVal indent As String, ByVal prefix As String, ByVal useCls As Boolean) As String
+    Dim codeList As New Collection
     Dim parentList As New Collection
     Const q As String = """"
     Dim varName As String
     Dim ctrl As Variant
-    Dim r As String
+    Dim result As String
     Dim parentVarName As String
     Dim controlVarName As String
     Dim radioButtonStrValue As String
-    r = ""
     For Each ctrl In ctrls
         controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
         parentVarName = GenerateCtrlVarName(ctrl.Parent, prefix, useCls)
@@ -1134,49 +1136,52 @@ Private Function SetTkRadiobuttonValues(ByVal ctrls As Variant, ByVal indent As 
             If Not CollContainsKey(parentList, parentVarName) Then
                 ' Use the Collection key to check and avoid redeclaring a variable that has already been declared
                 parentList.Add "", parentVarName
-                r = r & indent & varName & " = tk.StringVar()" & vbLf
-                r = r & indent & varName & ".set(None)" & vbLf ' Deselect the radio button
+                codeList.Add indent & varName & " = tk.StringVar()" & vbLf
+                codeList.Add indent & varName & ".set(None)" & vbLf ' Deselect the radio button
             End If
-            r = r & indent & controlVarName & ".configure(variable=" & varName & ", value=" & q & radioButtonStrValue & q & ")" & vbLf
+            codeList.Add indent & controlVarName & ".configure(variable=" & varName & ", value=" & q & radioButtonStrValue & q & ")" & vbLf
             If ctrl.value = True Then
-                r = r & indent & varName & ".set(" & q & radioButtonStrValue & q & ")" & vbLf
+                codeList.Add indent & varName & ".set(" & q & radioButtonStrValue & q & ")" & vbLf
             End If
             
         End If
     Next
-    SetTkRadiobuttonValues = r
+    result = JoinCollection(codeList, "")
+    SetTkRadiobuttonValues = result
 End Function
 
 Private Function SetTkCheckbuttonValues(ByVal ctrls As Variant, ByVal indent As String, ByVal prefix As String, ByVal useCls As Boolean) As String
+    Dim codeList As New Collection
     Dim varName As String
     Dim ctrl As Variant
     Dim value As Boolean
-    Dim r As String
+    Dim result As String
     Dim controlVarName As String
-    r = ""
     For Each ctrl In ctrls
         controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
         If TypeName(ctrl) = "CheckBox" Or TypeName(ctrl) = "ToggleButton" Then
             varName = controlVarName & "_checkbutton_value"
-            r = r & indent & varName & " = tk.BooleanVar()" & vbLf
-            r = r & indent & controlVarName & ".configure(variable=" & varName & ")" & vbLf
+            codeList.Add indent & varName & " = tk.BooleanVar()" & vbLf
+            codeList.Add indent & controlVarName & ".configure(variable=" & varName & ")" & vbLf
             If ctrl.value = True Then
                 value = True
             Else
                 value = False
             End If
-            r = r & indent & varName & ".set(" & value & ")" & vbLf
+            codeList.Add indent & varName & ".set(" & value & ")" & vbLf
             
         End If
     Next
-    SetTkCheckbuttonValues = r
+    result = JoinCollection(codeList, "")
+    SetTkCheckbuttonValues = result
 End Function
 
 Private Function SetVScrollBarToWidget(ByVal ctrl As Object, ByVal indent As String, ByVal prefix As String, ByVal useCls As Boolean, ByVal setToInside As Boolean) As String
     ' This function generates and returns the Tkinter Python code required to attach a vertical scrollbar to a specific widget.
     ' setToInside:
     '   A boolean flag that determines the scrollbar's placement. If set to True, the scrollbar is placed within the widget's boundaries (overlay mode). If False, it is placed outside the widget's edge.
-    Dim r As String
+    Dim codeList As New Collection
+    Dim result As String
     Dim scrollBarVarName As String
     Dim scrollBarCoordX As String
     Dim scrollBarCoordY As String
@@ -1186,7 +1191,6 @@ Private Function SetVScrollBarToWidget(ByVal ctrl As Object, ByVal indent As Str
     Dim parentVarName As String
     controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
     parentVarName = GenerateCtrlVarName(ctrl.Parent, prefix, useCls)
-    r = ""
     scrollBarVarName = controlVarName & "_" & "vscrollbar"
     scrollBarCoordX = "int(" & controlVarName & ".place_info()[""x""])" & "+" & "int(" & controlVarName & ".place_info()[""width""])"
     scrollBarCoordY = "int(" & controlVarName & ".place_info()[""y""])"
@@ -1200,19 +1204,20 @@ Private Function SetVScrollBarToWidget(ByVal ctrl As Object, ByVal indent As Str
         scrollBarCoordHeight = scrollBarCoordHeight & "-2"
     End If
     
-    r = r & indent & scrollBarVarName & " = tk.Scrollbar(" & parentVarName & ", orient=""vertical"")" & vbLf
-    r = r & indent & scrollBarVarName & ".place(x=" & scrollBarCoordX & ",y=" & scrollBarCoordY & ", width=" & scrollBarCoordWidth & ", height=" & scrollBarCoordHeight & ")" & vbLf
-    r = r & indent & controlVarName & ".configure(yscrollcommand=" & scrollBarVarName & ".set)" & vbLf
-    r = r & indent & scrollBarVarName & ".configure(command=" & controlVarName & ".yview)" & vbLf
-    
-    SetVScrollBarToWidget = r
+    codeList.Add indent & scrollBarVarName & " = tk.Scrollbar(" & parentVarName & ", orient=""vertical"")" & vbLf
+    codeList.Add indent & scrollBarVarName & ".place(x=" & scrollBarCoordX & ",y=" & scrollBarCoordY & ", width=" & scrollBarCoordWidth & ", height=" & scrollBarCoordHeight & ")" & vbLf
+    codeList.Add indent & controlVarName & ".configure(yscrollcommand=" & scrollBarVarName & ".set)" & vbLf
+    codeList.Add indent & scrollBarVarName & ".configure(command=" & controlVarName & ".yview)" & vbLf
+    result = JoinCollection(codeList, "")
+    SetVScrollBarToWidget = result
 End Function
 
 Private Function SetHScrollBarToWidget(ByVal ctrl As Object, ByVal indent As String, ByVal prefix As String, ByVal useCls As Boolean, ByVal setToInside As Boolean) As String
     ' This function generates and returns the Tkinter Python code required to attach a horizontal scrollbar to a specific widget
     ' setToInside:
     '   A boolean flag that determines the scrollbar's placement. If set to True, the scrollbar is placed within the widget's boundaries (overlay mode). If False, it is placed outside the widget's edge.
-    Dim r As String
+    Dim codeList As New Collection
+    Dim result As String
     Dim scrollBarVarName As String
     Dim scrollBarCoordX As String
     Dim scrollBarCoordY As String
@@ -1222,7 +1227,6 @@ Private Function SetHScrollBarToWidget(ByVal ctrl As Object, ByVal indent As Str
     Dim parentVarName As String
     controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
     parentVarName = GenerateCtrlVarName(ctrl.Parent, prefix, useCls)
-    r = ""
     scrollBarVarName = controlVarName & "_" & "hscrollbar"
     scrollBarCoordX = "int(" & controlVarName & ".place_info()[""x""])"
     scrollBarCoordY = "int(" & controlVarName & ".place_info()[""y""])" & "+" & "int(" & controlVarName & ".place_info()[""height""])"
@@ -1236,45 +1240,47 @@ Private Function SetHScrollBarToWidget(ByVal ctrl As Object, ByVal indent As Str
         scrollBarCoordHeight = scrollBarCoordHeight & "-1"
     End If
     
-    r = r & indent & scrollBarVarName & " = tk.Scrollbar(" & parentVarName & ", orient=""horizontal"")" & vbLf
-    r = r & indent & scrollBarVarName & ".place(x=" & scrollBarCoordX & ",y=" & scrollBarCoordY & ", width=" & scrollBarCoordWidth & ", height=" & scrollBarCoordHeight & ")" & vbLf
-    r = r & indent & controlVarName & ".configure(xscrollcommand=" & scrollBarVarName & ".set)" & vbLf
-    r = r & indent & scrollBarVarName & ".configure(command=" & controlVarName & ".xview)" & vbLf
-    
-    SetHScrollBarToWidget = r
+    codeList.Add indent & scrollBarVarName & " = tk.Scrollbar(" & parentVarName & ", orient=""horizontal"")" & vbLf
+    codeList.Add indent & scrollBarVarName & ".place(x=" & scrollBarCoordX & ",y=" & scrollBarCoordY & ", width=" & scrollBarCoordWidth & ", height=" & scrollBarCoordHeight & ")" & vbLf
+    codeList.Add indent & controlVarName & ".configure(xscrollcommand=" & scrollBarVarName & ".set)" & vbLf
+    codeList.Add indent & scrollBarVarName & ".configure(command=" & controlVarName & ".xview)" & vbLf
+    result = JoinCollection(codeList, "")
+    SetHScrollBarToWidget = result
 End Function
 
 Private Function GetListBoxValue(ByVal ctrl As Object, ByVal indent As String) As String
     ' Retrieve the items of a ListBox or ComboBox as a string in the format ["1", "2", "3"].
     Const q As String = """"
+    Dim codeList As New Collection
     Dim item As Variant
     Dim i As Long: i = 0
-    Dim r As String
+    Dim result As String
     Dim listIndent As String: listIndent = "    " & indent
     Const maxItemsPerLine As Long = 3
-    r = ""
     If ctrl.ListCount > 0 Then
-        If ctrl.ListCount > maxItemsPerLine Then r = r & vbLf & listIndent
+        If ctrl.ListCount > maxItemsPerLine Then codeList.Add vbLf & listIndent
         For Each item In ctrl.List
             i = i + 1
-            r = r & q & Convert2PythonFormatText(item) & q
+            codeList.Add q & Convert2PythonFormatText(item) & q
             If Not i = ctrl.ListCount Then
-                r = r & ", "
-                If i Mod maxItemsPerLine = 0 And ctrl.ListCount > maxItemsPerLine Then r = r & vbLf & listIndent
+                codeList.Add ", "
+                If i Mod maxItemsPerLine = 0 And ctrl.ListCount > maxItemsPerLine Then codeList.Add vbLf & listIndent
             Else
-                If ctrl.ListCount > maxItemsPerLine Then r = r & vbLf
+                If ctrl.ListCount > maxItemsPerLine Then codeList.Add vbLf
                 Exit For
             End If
         Next item
     End If
     
+    result = JoinCollection(codeList, "")
+    
     If ctrl.ListCount > maxItemsPerLine Then
-        r = "[" & r & indent & "]"
+        result = "[" & result & indent & "]"
     Else
-        r = "[" & r & "]"
+        result = "[" & result & "]"
     End If
     
-    GetListBoxValue = r
+    GetListBoxValue = result
 End Function
 
 Private Function DefineListViewColumns(ByVal ctrl As Object, ByVal indent As String, ByVal prefix As String, ByVal useCls As Boolean) As String
@@ -1286,26 +1292,26 @@ Private Function DefineListViewColumns(ByVal ctrl As Object, ByVal indent As Str
     ' ListView1.column("col1", width=133, anchor="w")
     ' ListView1.column("col2", width=133, anchor="w")
     ' ListView1.column("col3", width=133, anchor="w")
+    Dim codeList As New Collection
     Dim objHeaders As Object
     Set objHeaders = ctrl.ColumnHeaders
     Dim controlVarName As String
     Dim i As Long
     Dim item As Variant
-    Dim r As String
+    Dim result As String
     Dim colName As String
     Dim headerText As String
     Dim colWidth As Long
     Dim anchor As String
     Const q As String = """"
     controlVarName = GenerateCtrlVarName(ctrl, prefix, useCls)
-    r = ""
     i = 0
     For Each item In objHeaders
         i = i + 1
         colName = "col" & i
         headerText = Convert2PythonFormatText(item.text)
         anchor = GetTtkTreeviewAnchor(item)
-        r = r & indent & controlVarName & ".heading(" & q & colName & q & ", text=" & q & headerText & q & ", anchor=" & q & anchor & q & ")" & vbLf
+        codeList.Add indent & controlVarName & ".heading(" & q & colName & q & ", text=" & q & headerText & q & ", anchor=" & q & anchor & q & ")" & vbLf
     Next item
     
     i = 0
@@ -1314,10 +1320,12 @@ Private Function DefineListViewColumns(ByVal ctrl As Object, ByVal indent As Str
         colName = "col" & i
         anchor = GetTtkTreeviewAnchor(item)
         colWidth = UserFormSizeToPixel(item.width)
-        r = r & indent & controlVarName & ".column(" & q & colName & q & ", width=" & colWidth & ", anchor=" & q & anchor & q & ", stretch=False)" & vbLf
+        codeList.Add indent & controlVarName & ".column(" & q & colName & q & ", width=" & colWidth & ", anchor=" & q & anchor & q & ", stretch=False)" & vbLf
     Next item
     
-    DefineListViewColumns = r
+    result = JoinCollection(codeList, "")
+    
+    DefineListViewColumns = result
 End Function
 
 Private Function GetTtkTreeviewAnchor(ByVal objLvHeader As Object) As String
@@ -1346,19 +1354,16 @@ Private Function GenerateListViewHeaders(ByVal ctrl As Object) As String
     Dim i As Long
     Dim item As Variant
     Dim colName As String
-    Dim r As String
+    Dim result As String
     Const q As String = """"
     Dim coll As New Collection
-    Dim arr() As Variant
-    r = ""
     For Each item In objHeaders
         i = i + 1
         colName = "col" & i
         coll.Add q & colName & q
     Next item
-    arr = Collection2Array(coll)
-    r = r & "[" & Join(arr, ", ") & "]"
-    GenerateListViewHeaders = r
+    result = "[" & JoinCollection(coll, ", ") & "]"
+    GenerateListViewHeaders = result
 End Function
 
 Private Function GetListViewItems(ByVal ctrl As Object, ByVal indent As String) As String
@@ -1372,12 +1377,10 @@ Private Function GetListViewItems(ByVal ctrl As Object, ByVal indent As String) 
     Dim i As Long
     Dim coll As Collection
     Dim resultColl As New Collection
-    Dim arr() As Variant
-    Dim r As String
+    Dim result As String
     Const arrayLiteralStart As String = "["
     Const arrayLiteralEnd As String = "]"
     Const q As String = """"
-    r = ""
     For Each item In ctrl.ListItems
         Set coll = New Collection
         coll.Add q & Convert2PythonFormatText(item.text) & q
@@ -1387,18 +1390,16 @@ Private Function GetListViewItems(ByVal ctrl As Object, ByVal indent As String) 
             coll.Add q & Convert2PythonFormatText(item.SubItems(i)) & q
         Next
         
-        arr = Collection2Array(coll)
-        resultColl.Add arrayLiteralStart & Join(arr, ", ") & arrayLiteralEnd
+        resultColl.Add arrayLiteralStart & JoinCollection(coll, ", ") & arrayLiteralEnd
         
     Next
     
-    arr = Collection2Array(resultColl)
     If resultColl.Count > 0 Then
-        r = r & arrayLiteralStart & vbLf & indent & "    " & Join(arr, ", " & vbLf & indent & "    ") & vbLf & indent & arrayLiteralEnd
+        result = arrayLiteralStart & vbLf & indent & "    " & JoinCollection(resultColl, ", " & vbLf & indent & "    ") & vbLf & indent & arrayLiteralEnd
     Else
-        r = r & arrayLiteralStart & arrayLiteralEnd
+        result = arrayLiteralStart & arrayLiteralEnd
     End If
-    GetListViewItems = r
+    GetListViewItems = result
 End Function
 
 Private Function GetTextSizeFromCtrlFontSetting(ByVal ctrl As Object, ByVal targetText As String) As Variant()
@@ -1410,7 +1411,7 @@ Private Function GetTextSizeFromCtrlFontSetting(ByVal ctrl As Object, ByVal targ
     ' Parameters:
     '   ctrl        - The reference control whose font settings will be used.
     '   targetText  - The text to measure. If empty, "i" is used to ensure a measurable size is returned.
-    '                 (The letter gih is one of the ASCII characters with the narrowest rendering width.)
+    '                 (The letter "i" is one of the ASCII characters with the narrowest rendering width.)
     '
     ' Returns:
     '   Variant() Array
@@ -1920,7 +1921,7 @@ Private Function GenerateUUIDv4() As String
     GenerateUUIDv4 = LCase$(hexStr)
 End Function
 
-Private Sub SaveUTF8Text_NoBOM(ByVal filePath As String, ByVal textData As String)
+Private Sub SaveUtf8TextNoBom(ByVal filePath As String, ByVal textData As String)
     ' Save the specified string as UTF-8 without BOM
     Dim stream As Object
     Dim bytes() As Byte
@@ -2008,7 +2009,7 @@ Private Function SortFormControlsByDepth(ByVal frmControls As Variant) As Collec
         tempColl.Add VBA.Array(depth, ctrl)
     Next ctrl
     If tempColl.Count > 0 Then
-        tempArray = Collection2Array(tempColl)
+        tempArray = CollectionToArray(tempColl)
         Call InsertionSortJaggedArray(tempArray, reverse:=False)
         For Each item In tempArray
             sortedColl.Add item(1)
@@ -2018,7 +2019,7 @@ Private Function SortFormControlsByDepth(ByVal frmControls As Variant) As Collec
 End Function
 
 
-Private Function Collection2Array(ByVal coll As Collection, Optional ByVal isStartIdx1 As Boolean = False) As Variant()
+Private Function CollectionToArray(ByVal coll As Collection, Optional ByVal isStartIdx1 As Boolean = False) As Variant()
     ' Convert a Collection to an array
     ' If isStartIdx1 is True, create an array starting from index 1 (to match Collection numbering)
     Dim arr() As Variant
@@ -2043,7 +2044,7 @@ Private Function Collection2Array(ByVal coll As Collection, Optional ByVal isSta
     Else
         arr = VBA.Array()
     End If
-    Collection2Array = arr
+    CollectionToArray = arr
 End Function
 
 
@@ -2165,4 +2166,10 @@ Exception:
     Exit Function
 End Function
 
-
+Private Function JoinCollection(ByVal coll As Collection, Optional ByVal delimiter As String = "") As String
+    Dim arr() As Variant
+    Dim result As String
+    arr = CollectionToArray(coll)
+    result = Join(arr, delimiter)
+    JoinCollection = result
+End Function
