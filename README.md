@@ -10,6 +10,8 @@ This program converts userforms created in Microsoft Office VBA into Python Tkin
 - Supported OS: Windows XP or later
 - Required Software: Microsoft Excel/Word/PowerPoint/Outlook 2000 or later
 - Recommended Environment: Microsoft Excel 2016 or later
+> Note:  
+> Python 3.4 or later is required to run the generated code.
 
 ## Verified Operating Environments
 - Windows XP(SP3)
