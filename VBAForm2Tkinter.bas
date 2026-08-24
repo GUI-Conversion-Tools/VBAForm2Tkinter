@@ -1,6 +1,6 @@
 Attribute VB_Name = "VBAForm2Tkinter"
 
-' VBAForm2Tkinter v1.5.1
+' VBAForm2Tkinter v1.5.2
 ' https://github.com/GUI-Conversion-Tools/VBAForm2Tkinter
 ' Copyright (c) 2025-2026 ZeeZeX
 ' This software is released under the MIT License.
@@ -35,6 +35,8 @@ Option Explicit
     Private Declare PtrSafe Function GdipDrawImageRectI Lib "gdiplus" (ByVal graphics As LongPtr, ByVal image As LongPtr, ByVal x As Long, ByVal y As Long, ByVal width As Long, ByVal height As Long) As Long
     Private Declare PtrSafe Function GdipSaveImageToFile Lib "gdiplus" (ByVal image As LongPtr, ByVal filename As LongPtr, ByRef clsidEncoder As GUID, ByVal encoderParams As LongPtr) As Long
     Private Declare PtrSafe Function CLSIDFromString Lib "ole32" (ByVal lpsz As LongPtr, ByRef pclsid As GUID) As Long
+    
+    Private Declare PtrSafe Function CryptBinaryToStringW Lib "crypt32" (ByVal pbBinary As LongPtr, ByVal cbBinary As Long, ByVal dwFlags As Long, ByVal pszString As LongPtr, ByRef pcchString As Long) As Long
 #Else
     ' 32bit Office
     Private Declare Function GetSysColor Lib "user32" (ByVal nIndex As Long) As Long
@@ -52,6 +54,8 @@ Option Explicit
     Private Declare Function GdipDrawImageRectI Lib "gdiplus" (ByVal graphics As Long, ByVal image As Long, ByVal x As Long, ByVal y As Long, ByVal width As Long, ByVal height As Long) As Long
     Private Declare Function GdipSaveImageToFile Lib "gdiplus" (ByVal image As Long, ByVal filename As Long, ByRef clsidEncoder As GUID, ByVal encoderParams As Long) As Long
     Private Declare Function CLSIDFromString Lib "ole32" (ByVal lpsz As Long, ByRef pclsid As GUID) As Long
+    
+    Private Declare Function CryptBinaryToStringW Lib "crypt32" (ByVal pbBinary As Long, ByVal cbBinary As Long, ByVal dwFlags As Long, ByVal pszString As Long, ByRef pcchString As Long) As Long
 #End If
 
 Private Type GDIPlusStartupInput: GdiPlusVersion As Long: DebugEventCallback As LongPtr: SuppressBackgroundThread As Long: SuppressExternalCodecs As Long: End Type
@@ -172,7 +176,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
     Set fso = CreateObject("Scripting.FileSystemObject")
     Dim supportedImageModeValues() As Variant
     
-    imageMode = LCase(imageMode)
+    imageMode = LCase$(imageMode)
     supportedImageModeValues = Array("file", "disabled", "reference-only", "base64", "base64-dict", "base64-json", "base64-json-reference")
     If Not ContainsValue(supportedImageModeValues, imageMode) Then
         MsgBox "[imageMode] Invalid value: " & q & imageMode & q & vbLf & "Supported values are " & q & Join(supportedImageModeValues, q & ", " & q) & q
@@ -202,7 +206,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
     codeList.Add "from tkinter import ttk" & vbLf
     codeList.Add "from tkinter import font" & vbLf
     codeList.Add "import pathlib" & vbLf
-    If InStr(imageMode, "json") <> 0 Then codeList.Add "import json" & vbLf
+    If InStr(imageMode, "json") > 0 Then codeList.Add "import json" & vbLf
     codeList.Add vbLf
     codeList.Add "BASE_DIR = pathlib.Path(__file__).resolve().parent" & vbLf
     
@@ -222,16 +226,16 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
         unavailableNames = VBA.Array("", "tk", "ttk", "font", "style", "int", "item", "image_base64_dict", "base_dir")
         
         For i = LBound(unavailableNames) To UBound(unavailableNames)
-            unavailableNames(i) = LCase(unavailableNames(i))
+            unavailableNames(i) = LCase$(unavailableNames(i))
         Next
         
-        If ContainsValue(unavailableNames, LCase(root.Name)) Then
+        If ContainsValue(unavailableNames, LCase$(root.Name)) Then
             MsgBox GenerateUnavailableNameMessage(root)
             result = ""
             GenerateTkinterCode = result
             Exit Function
         End If
-        unavailableNames(0) = LCase(FORM_WINDOW_NAME)
+        unavailableNames(0) = LCase$(FORM_WINDOW_NAME)
         
         ' Convert UserForm's size to pixel size
         pixelWidth = UserFormSizeToPixel(root.InsideWidth)
@@ -290,14 +294,14 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
             
             ' Generate unique style name to prevent naming conflicts.
             If uniqueStyleName Then
-                tkStyleBaseName = GenerateCtrlVarName(ctrl, "", False) & "." & Left(GenerateUUIDv4, 8) & ".style"
+                tkStyleBaseName = GenerateCtrlVarName(ctrl, "", False) & "." & Left$(GenerateUUIDv4, 8) & ".style"
             Else
                 tkStyleBaseName = GenerateCtrlVarName(ctrl, "", False) & ".style"
             End If
             
             ttkStyleRef = GenerateTtkStyleRef(controlVarName)
             
-            If ContainsValue(unavailableNames, LCase(ctrl.Name)) Then
+            If ContainsValue(unavailableNames, LCase$(ctrl.Name)) Then
                 MsgBox GenerateUnavailableNameMessage(ctrl)
                 result = ""
                 GenerateTkinterCode = result
@@ -360,7 +364,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                     If GetTkWidgetName(ctrl) = "tk.Entry" Then
                         codeList.Add indent & controlVarName & ".insert(0, " & q & Convert2PythonFormatText(ctrl.text) & q & ")" & vbLf
                         If ctrl.PasswordChar <> "" Then
-                            codeList.Add indent & controlVarName & ".configure(show=" & q & Left(ctrl.PasswordChar, 1) & q & ")" & vbLf
+                            codeList.Add indent & controlVarName & ".configure(show=" & q & Left$(ctrl.PasswordChar, 1) & q & ")" & vbLf
                         End If
                         
                         If ctrl.Locked Then
@@ -462,7 +466,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
                         Case Else
                             orientation = "Vertical"
                     End Select
-                    codeList.Add indent & controlVarName & ".configure(from_=" & ctrl.Min & ", to=" & ctrl.Max & ",orient=" & q & LCase(orientation) & q & ")" & vbLf
+                    codeList.Add indent & controlVarName & ".configure(from_=" & ctrl.Min & ", to=" & ctrl.Max & ",orient=" & q & LCase$(orientation) & q & ")" & vbLf
                     styleName = tkStyleBaseName & "." & orientation & ".TScale"
                     codeList.Add indent & GenerateTtkStyleDefinitionCode(controlVarName, styleName, useCls) & vbLf
                     codeList.Add indent & prefix & "style.configure(" & ttkStyleRef & ", background=" & q & FormColorToHex(ctrl.BackColor) & q & ")" & vbLf
@@ -762,9 +766,9 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
     If ContainsValue(Array("base64-dict", "base64-json", "base64-json-reference"), imageMode) Then
         base64PictureDictStr = "{" & vbLf & JoinCollection(base64PictureDictStrs, "," & vbLf) & vbLf & "}" & vbLf
         If imageMode = "base64-dict" Then
-            result = VBA.Replace(result, uniqueStringToReplace, "image_base64_dict = " & base64PictureDictStr)
+            result = VBA.Replace$(result, uniqueStringToReplace, "image_base64_dict = " & base64PictureDictStr)
         Else
-            result = VBA.Replace(result, uniqueStringToReplace, "")
+            result = VBA.Replace$(result, uniqueStringToReplace, "")
         End If
         
         
@@ -773,7 +777,7 @@ Public Function GenerateTkinterCode(ByVal frms As Variant, Optional ByVal useCls
         End If
     
     Else
-        result = VBA.Replace(result, uniqueStringToReplace, "")
+        result = VBA.Replace$(result, uniqueStringToReplace, "")
     End If
     
     
@@ -1440,7 +1444,7 @@ Private Function GetTextSizeFromCtrlFontSetting(ByVal ctrl As Object, ByVal targ
     ' Prevent zero-size measurement for empty strings.
     If targetText = "" Then targetText = "i"
     ' Generate a unique temporary control name.
-    tempName = "TempLabel_" & VBA.Replace(GenerateUUIDv4(), "-", "_")
+    tempName = "TempLabel_" & VBA.Replace$(GenerateUUIDv4(), "-", "_")
     ' Get the parent UserForm from the specified control.
     Set rootForm = GetUserFormObjectFromCtrl(ctrl)
     ' Create a temporary Label control for text measurement.
@@ -1548,14 +1552,14 @@ End Function
 
 Private Function Convert2PythonFormatText(ByVal text As String) As String
     ' Escape special characters in the string
-    text = VBA.Replace(text, "\", "\\")
-    text = VBA.Replace(text, """", "\" & """")
-    text = VBA.Replace(text, "'", "\" & "'")
+    text = VBA.Replace$(text, "\", "\\")
+    text = VBA.Replace$(text, """", "\" & """")
+    text = VBA.Replace$(text, "'", "\" & "'")
     ' Convert VBA line breaks to Python format
     ' vbCrLf should be replaced first
-    text = VBA.Replace(text, vbCrLf, vbLf)
-    text = VBA.Replace(text, vbCr, vbLf)
-    text = VBA.Replace(text, vbLf, "\n")
+    text = VBA.Replace$(text, vbCrLf, vbLf)
+    text = VBA.Replace$(text, vbCr, vbLf)
+    text = VBA.Replace$(text, vbLf, "\n")
     Convert2PythonFormatText = text
 End Function
 
@@ -1578,9 +1582,9 @@ Private Function FormColorToHex(ByVal clr As Long) As String
     
     ' Convert the decimal RGB values to a #RRGGBB hex string and return it
     FormColorToHex = "#" & _
-                     Right("0" & Hex(r), 2) & _
-                     Right("0" & Hex(g), 2) & _
-                     Right("0" & Hex(b), 2)
+                     Right$("0" & Hex(r), 2) & _
+                     Right$("0" & Hex(g), 2) & _
+                     Right$("0" & Hex(b), 2)
 End Function
 
 Private Sub ConvertImageFormat(ByVal srcPath As String, ByVal dstPath As String, _
@@ -1635,7 +1639,7 @@ Private Sub ConvertImageFormat(ByVal srcPath As String, ByVal dstPath As String,
     
     ' Determine output format by file extension
     Set fso = CreateObject("Scripting.FileSystemObject")
-    ext = LCase(fso.GetExtensionName(dstPath))
+    ext = LCase$(fso.GetExtensionName(dstPath))
     
     Select Case ext
         Case "png"
@@ -1763,33 +1767,118 @@ End Sub
 
 
 Private Function FileToBase64(ByVal filePath As String) As String
+    ' Converts a file to a Base64-encoded string.
     Dim stream As Object
-    Dim xml As Object
-    Dim node As Object
+    Dim bytes() As Byte
+    Dim emptyBytes() As Byte
+    emptyBytes = VBA.vbNullString ' Empty Byte Array
     
-
     ' Load file as binary
     Set stream = CreateObject("ADODB.Stream")
     stream.Type = 1 ' binary
     stream.Open
     stream.LoadFromFile filePath
-
-    ' Convert binary to Base64
-    Set xml = CreateObject("MSXML2.DOMDocument")
-    Set node = xml.createElement("base64")
-
-    node.DataType = "bin.base64"
-    node.nodeTypedValue = stream.Read
-
-    ' Remove line breaks
-    FileToBase64 = VBA.Replace(node.text, vbLf, "")
-    FileToBase64 = VBA.Replace(FileToBase64, vbCr, "")
-
+    
+    If stream.Size > 0 Then
+        bytes = stream.Read
+    Else
+        bytes = emptyBytes
+    End If
+    
     stream.Close
-    Set node = Nothing
-    Set xml = Nothing
     Set stream = Nothing
+    
+    ' Convert binary to Base64
+    FileToBase64 = BytesToBase64(bytes)
 
+End Function
+
+Private Function BytesToBase64(ByRef bytes() As Byte) As String
+    ' Converts a byte array to a Base64 string.
+    ' Implemented using the Windows API for high performance.
+    ' The implementation supports byte arrays up to 1,610,612,733 bytes by design,
+    ' but in practice, memory limitations may be reached with smaller arrays.
+    Dim cch As Long
+    Dim requiredCharCount As Long
+    Dim buffer As String
+    Dim dwFlags As Long
+    Dim charCountOffset As Long
+    Dim dataSize As Double
+    Const STRING_FUNCTION_MAXIMUM_LIMIT As Long = 1073741823
+    Const STRING_VARIABLE_MAXIMUM_LIMIT As Long = 2147483645
+    Const MAXIMUM_DATA_SIZE As Long = 1610612733 ' The largest value that ensures the Base64-encoded size does not exceed the String type's maximum length of 2,147,483,645 characters.
+    Const CRYPT_STRING_BASE64 As Long = &H1
+    Const CRYPT_STRING_NOCRLF As Long = &H40000000
+
+    dwFlags = CRYPT_STRING_BASE64 Or CRYPT_STRING_NOCRLF
+    dataSize = 0
+    On Error Resume Next
+    dataSize = UBound(bytes) - LBound(bytes) + 1
+    On Error GoTo 0
+    
+    If dataSize = 0 Then
+        BytesToBase64 = ""
+        Exit Function
+    End If
+    
+    If dataSize > MAXIMUM_DATA_SIZE Then
+        Err.Raise Number:=9000, Description:="Error: Data size (" & dataSize & ") exceeds the maximum limit (" & MAXIMUM_DATA_SIZE & ")."
+    End If
+    
+    ' Get required output length (includes terminating null)
+    If CryptBinaryToStringW( _
+            VarPtr(bytes(LBound(bytes))), _
+            UBound(bytes) - LBound(bytes) + 1, _
+            dwFlags, _
+            0, _
+            cch) = 0 Then
+        Err.Raise vbObjectError + 1, , "CryptBinaryToStringW failed."
+    End If
+    
+    If 0 >= cch Then
+        Err.Raise Number:=9500, Description:="Error: Overflow occurred because the data size is too large"
+    End If
+    
+    ' CryptBinaryToStringW returns the required character count including
+    ' the terminating null character. VBA strings (BSTR) store their length
+    ' separately, so the null terminator is not part of the string length.
+    ' Allocate one fewer character to avoid including the terminating null
+    ' in the resulting VBA string.
+    requiredCharCount = cch - 1
+    
+    If requiredCharCount > STRING_VARIABLE_MAXIMUM_LIMIT Then
+        Err.Raise Number:=10000, Description:="Error: Data size (" & requiredCharCount & ") exceeds the maximum limit (" & STRING_VARIABLE_MAXIMUM_LIMIT & ")."
+    End If
+    
+    ' Allocate output buffer
+    'The String$ function is limited to 1,073,741,823 characters per call,
+    'although a String variable can hold up to 2,147,483,645 characters.
+    'Allocate larger buffers by concatenating multiple String$ calls.
+    If requiredCharCount > STRING_FUNCTION_MAXIMUM_LIMIT Then
+        charCountOffset = requiredCharCount - STRING_FUNCTION_MAXIMUM_LIMIT
+        buffer = String$(requiredCharCount - charCountOffset, vbNullChar) & String$(charCountOffset, vbNullChar)
+    Else
+        buffer = String$(requiredCharCount, vbNullChar)
+    End If
+    
+
+    ' Convert
+    If CryptBinaryToStringW( _
+            VarPtr(bytes(LBound(bytes))), _
+            UBound(bytes) - LBound(bytes) + 1, _
+            dwFlags, _
+            StrPtr(buffer), _
+            cch) = 0 Then
+        Err.Raise vbObjectError + 2, , "CryptBinaryToStringW failed."
+    End If
+    
+    ' Windows XP does not support CRYPT_STRING_NOCRLF with CryptBinaryToStringW, so the generated Base64 string may contain line breaks.
+    ' Therefore, if the string contains CRLF, replace them with an empty string to remove them.
+    If InStr(buffer, VBA.vbCrLf) > 0 Then
+        buffer = VBA.Replace$(buffer, VBA.vbCrLf, "")
+    End If
+    
+    BytesToBase64 = buffer
 End Function
 
 Private Function ContainsValue(ByVal itemList As Variant, ByVal value As Variant) As Boolean
@@ -1801,7 +1890,7 @@ Private Function ContainsValue(ByVal itemList As Variant, ByVal value As Variant
     ' Dependency: IsStrictlyEqual(helper function)
     Dim item As Variant
     Dim temp As Variant
-    If LCase(TypeName(itemList)) = "dictionary" Then
+    If LCase$(TypeName(itemList)) = "dictionary" Then
         itemList = itemList.items
     End If
     If IsArray(itemList) Then
@@ -1923,25 +2012,36 @@ End Function
 
 Private Sub SaveUtf8TextNoBom(ByVal filePath As String, ByVal textData As String)
     ' Save the specified string as UTF-8 without BOM
-    Dim stream As Object
+    Dim textStream As Object
+    Dim binaryStream As Object
     Dim bytes() As Byte
+    Dim emptyBytes() As Byte
+    emptyBytes = VBA.vbNullString ' Empty Byte Array
     
     ' Normalize line endings
-    textData = VBA.Replace(textData, vbCrLf, vbLf)
-    textData = VBA.Replace(textData, vbCr, vbLf)
-    textData = VBA.Replace(textData, vbLf, vbNewLine)
+    textData = VBA.Replace$(textData, vbCrLf, vbLf)
+    textData = VBA.Replace$(textData, vbCr, vbLf)
+    textData = VBA.Replace$(textData, vbLf, vbNewLine)
     
     ' Convert to UTF-8 and remove BOM
-    Set stream = CreateObject("ADODB.Stream")
-    stream.Type = 2 ' Text mode
-    stream.Charset = "utf-8"
-    stream.Open
-    stream.WriteText textData
-    stream.position = 0
-    stream.Type = 1 ' Switch to binary mode
-    bytes = stream.Read
-    stream.Close
-    Set stream = Nothing
+    Set textStream = CreateObject("ADODB.Stream")
+    With textStream
+        .Type = 2 ' Text mode
+        .Charset = "utf-8"
+        .Open
+        .WriteText textData
+        .position = 0
+        .Type = 1 ' Switch to binary mode
+        
+        If .Size > 0 Then
+            bytes = .Read
+        Else
+            bytes = emptyBytes
+        End If
+        
+        .Close
+    End With
+    Set textStream = Nothing
     
     ' Remove BOM if present
     If UBound(bytes) >= 2 Then
@@ -1951,13 +2051,15 @@ Private Sub SaveUtf8TextNoBom(ByVal filePath As String, ByVal textData As String
     End If
     
     ' Save file in binary mode
-    Set stream = CreateObject("ADODB.Stream")
-    stream.Type = 1
-    stream.Open
-    stream.Write bytes
-    stream.SaveToFile filePath, 2
-    stream.Close
-    Set stream = Nothing
+    Set binaryStream = CreateObject("ADODB.Stream")
+    With binaryStream
+        .Type = 1
+        .Open
+        .Write bytes
+        .SaveToFile filePath, 2
+        .Close
+    End With
+    Set binaryStream = Nothing
 End Sub
 
 
