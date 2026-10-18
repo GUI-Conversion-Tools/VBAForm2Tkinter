@@ -26,6 +26,7 @@ This program converts userforms created in Microsoft Office VBA into Python Tkin
 ## Converted Elements
 - Variable names (object names)
 - Approximate layout and size of controls
+- Z-order of controls
 - Control colors (foreground)
 - Control colors (background)
 - Text display (`Label`, `CommandButton`, `CheckBox`, `ToggleButton`, `OptionButton`, `MultiPage`)
@@ -38,6 +39,7 @@ This program converts userforms created in Microsoft Office VBA into Python Tkin
 - Selection state of `OptionButton`, `CheckBox` and `ToggleButton`
 - Transparent background setting specified in `.BackStyle`(`Label`, `TextBox`, `CommandButton`, `CheckBox`, `ToggleButton`, `OptionButton`, `Image`, `ComboBox`)
 - Images Embedded in Controls (`Image`)
+- `.Visible` property
 - `.TabOrientation` property (`MultiPage`)
 - `.Locked` property (`TextBox`, `ListBox`, `ComboBox`)
 - `.PasswordChar` property (`TextBox` [.MultiLine=False])
@@ -161,13 +163,3 @@ Call ConvertForm2Tkinter(Array(UserForm1, UserForm2))
 ' Example: Converting a single form (With image streams embedded directly as Base64 text)
 Call ConvertForm2Tkinter(UserForm1, imageMode:="base64")
 ```
-
-## Control Order (for Controls Without Child Elements)
-In Tkinter, if you place one `Label` on top of another, the later widget appears in front.<br>
-However, in VBA, you can change front/back order, so the behavior differs.<br>
-The program first sorts controls by hierarchy level; however, it preserves the original creation order within the same hierarchy.<br>
-Since VBA’s z-order (front/back) cannot currently be retrieved, some displays may not match VBA.<br>
-
-To adjust:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;Edit the Python code so the widget you want in front is placed later, or Reorder the controls in VBA before conversion.<br>
-&nbsp;&nbsp;&nbsp;&nbsp;For new GUIs, instead of overlapping controls, it is recommended to use containers like `Frame`, which allow clear parent-child relationships.

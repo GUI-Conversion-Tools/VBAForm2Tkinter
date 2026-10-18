@@ -26,6 +26,7 @@
 ## 反映する項目
 - 変数名(オブジェクト名)
 - コントロールのおおよそのレイアウトとサイズ
+- コントロールのZオーダー(重なり順)
 - コントロールの色(文字色)
 - コントロールの色(背景色)
 - テキスト表示(`Label`, `CommandButton`, `CheckBox`, `ToggleButton`, `OptionButton`, `MultiPage`)
@@ -38,6 +39,7 @@
 - `OptionButton`, `CheckBox`, `ToggleButton`の選択状態
 - `BackStyle`に設定した透明表示設定 (`Label`, `TextBox`, `CommandButton`, `CheckBox`, `ToggleButton`, `OptionButton`, `Image`, `ComboBox`)
 - コントロールに埋め込まれた画像 (`Image`)
+- `.Visible`プロパティ
 - `.TabOrientation`プロパティ (`MultiPage`)
 - `.Locked`プロパティ (`TextBox`, `ListBox`, `ComboBox`)
 - `.PasswordChar`プロパティ (`TextBox` [.MultiLine=False])
@@ -158,11 +160,3 @@ Call ConvertForm2Tkinter(Array(UserForm1, UserForm2))
 ' 実行例: 単一のフォームを変換 (画像をBase64文字列としてコード内に直接埋め込む)
 Call ConvertForm2Tkinter(UserForm1, imageMode:="base64")
 ```
-
-## 子要素を設定できないコントロールの並び順について
-Tkinterでは例として`Label`に`Label`を重ねた場合は設置した順番が後のものが優先して前面に表示されます<br>
-ただしVBAのユーザーフォームにおいては前面/背面を変更することができるためこの限りではありません<br>
-このプログラムは各コントロールを階層順にソート後、同じ階層のものについては元々の設置順に従いウィジェットを配置します<br>
-現状コントロールのZオーダー(前面/背面情報)を取得できる手段がないため反映させることができずVBAでの表示と異なってしまう場合があります<br>
-その場合は、Pythonのコードを編集し、前面に表示したいものを後に設置するか、VBA側でコントロールを配置し直すことで順番を後にしてください<br>
-なお、新規でGUIを作成する場合は重ねるよりも`Frame`などの明確な親子関係を設定可能なコントロールを使用することを推奨します<br>
